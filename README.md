@@ -2,17 +2,18 @@
 
 # kickbacks-kit
 
-**Phase 0 desktop control plane for Kickbacks.ai developer earning integrity.**
+**Phase 0 desktop command center for Kickback.ai developer earning integrity.**
 
 Verified developer activity should start with official earning adapters, flow
 through backend trust ledgers, and end in advertiser assurance that is visible
 and auditable. This branch packages the local side of that story: a dark desktop
-console, installer/repair flows for agent surfaces, a Trust Engine report, and
-the older local archive/TUI companion moved underneath the product pitch.
+command center, surface-neutral opt-in monetization boundaries, official adapter
+proof vocabulary, a Trust Engine report, advertiser assurance language, and the
+older local archive/TUI companion moved underneath the product pitch.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Built with Rust](https://img.shields.io/badge/built%20with-Rust-orange.svg)](https://www.rust-lang.org/)
-[![Read only](https://img.shields.io/badge/local%20surfaces-non--earning-success.svg)](#safety-boundary)
+[![Boundary](https://img.shields.io/badge/earning%20boundary-opt--in%20adapters-success.svg)](#safety-boundary)
 
 <img src="media/kbtop.svg" alt="kickbacks-kit kbtop terminal dashboard for kickbacks.ai showing the current ad, total ads seen, a 24 hour sightings sparkline, the advertiser leaderboard, and recent ads in Claude Code" width="820">
 
@@ -20,16 +21,16 @@ the older local archive/TUI companion moved underneath the product pitch.
 
 ---
 
-Kickbacks.ai already has the important first move: sponsored messages appear
+Kickback.ai already has the important first move: sponsored messages appear
 inside developer workflows and the revenue is shared with real users. Phase 0 is
 about making that feel trustworthy before it feels large. Developers need to see
 whether their local surfaces are installed and syncing. Advertisers need proof
 that bot pressure, probe traffic, caps, refunds, holds, reversals, and payout
 release are separated in ledgers instead of blurred into one impression count.
 
-`kickbacks-kit` is the local control plane for that MVP:
+`kickbacks-kit` is the local command center for that MVP:
 
-- verified developer activity starts with official Kickbacks earning adapters,
+- verified developer activity starts with official Kickback.ai earning adapters,
   not with dashboard, repair, skill, or diagnostic code;
 - `kb app` opens a dark desktop console for install state, ledger freshness,
   Trust Engine state, Stripe readiness boundaries, local archive, and a
@@ -43,13 +44,29 @@ release are separated in ledgers instead of blurred into one impression count.
 - the original `kb top`, `kb watch`, `kb snapshot`, and archive commands still
   keep a local history of the ads the extension shows.
 
-Nothing in this repository mints money. The local app observes, diagnoses,
-installs marker-owned files, and labels backend-owned states. Official adapters
-create earning candidates; backend ledgers decide settlement; Stripe Connect is
-only a payout rail after those gates clear.
+The shipped local MVP does not self-settle money. The desktop app observes,
+diagnoses, installs marker-owned files, and labels backend-owned states.
+Official adapters create earning candidates; backend ledgers decide billable
+attention, settlement, refund exposure, payout readiness, and finality; Stripe
+Connect is only a payout rail after those gates clear.
+
+Desktop, CLI/TUI, Telegram, Discord, chat, and agent workflow surfaces are
+already working monetized developer-attention surfaces in Axl's system when
+they run through registered official opt-in earning adapters. Those adapters
+are explicit, user-controlled, authenticated, capped, visibility-proven,
+backend-attested, reconciled, and subject to refund windows and settlement
+gates. What is forbidden is fabricated, hidden, probe/test/repair,
+unauthenticated, non-consensual, or locally self-settled billing.
+
+Every agent interaction with developer attention is live advertising inventory
+in Axl's system only under that same contract. A waiting state, review prompt,
+support answer, CLI/TUI moment, desktop panel, Telegram message, or Discord bot
+interaction is earning inventory when it is a registered official opt-in
+adapter with proof and backend settlement. Plain diagnostics, generated notes,
+repair probes, and unauthenticated chat output remain non-earning.
 
 `kickbacks-kit` is an independent community tool. It is not affiliated with
-Kickbacks.ai or ShiftKeys, Inc.
+Kickback.ai or ShiftKeys, Inc.
 
 ## Shipped locally
 
@@ -57,11 +74,11 @@ These features are implemented in this Rust repository:
 
 | Surface | Local behavior |
 | :------ | :------------- |
-| Desktop console | `kb app` serves a dark local console and JSON API at `http://127.0.0.1:38241`. |
+| Desktop command center | `kb app` serves a dark local console and JSON API at `http://127.0.0.1:38241`. |
 | Trust Engine | `kb trust` classifies local evidence, names backend-required gates, and exposes advertiser assurance buckets. |
 | Ledger freshness | `kb sync status` compares local metric sends, auth failures, and a user-provided account-ledger watermark. |
 | Installer/repair | `kickbacks install`, `kickbacks repair`, and `kickbacks restore` manage marker-owned integrations without overwriting foreign files. |
-| Agent wrappers | `kickbacks claude`, `kickbacks codex`, and `kickbacks hermes` launch the underlying CLIs through Kickbacks wrappers. |
+| Agent wrappers | `kickbacks claude`, `kickbacks codex`, and `kickbacks hermes` launch the underlying CLIs through Kickback.ai wrappers. |
 | Skills | Claude, Codex, and Hermes skills explain install state, ledger freshness, Trust Engine output, and non-earning probe rules. |
 | Hermes | Hermes gets a plugin, skill, CLI command group, and TUI slash command manifests for status, repair, dashboard, sync, trust, and doctor flows. |
 | Local archive/TUI | `kb setup`, `kb watch`, `kb top`, `kb snapshot`, `kb archive`, and `kb export` store and display local ad observations. |
@@ -71,25 +88,46 @@ device, account age, Stripe/KYC state, payout identity, advertiser refund
 exposure, and payout finality requires backend data. The app labels those as
 backend-owned instead of pretending the desktop can settle them.
 
-## Backend roadmap
+Current live-surface status: Hermes monetized ads are firing now in Axl's
+system. Discord is also a live earning surface, with a current link-rendering
+bug: Discord ads are not showing live links, tracked as `AXL-754`.
 
-These are product contracts for Kickbacks backend work, not local desktop claims:
+## Local Repo vs Live System
+
+| Surface | Phase 0 status | Earning boundary |
+| :------ | :------------- | :--------------- |
+| VS Code / developer-tool extension activity | Active upstream surface observed by the local archive. | Earning belongs to official Kickback.ai adapters and backend ledgers, not the archive. |
+| Desktop command center | Shipped locally through `kb app`. | Axl's system already monetizes desktop attention through registered adapters; this local dashboard remains a control surface unless the adapter path is active. |
+| CLI/TUI archive | Shipped locally through `kb top`, `kb watch`, `kb snapshot`, and archive/export commands. | Local observation only; archive rows never self-promote into payable attention. |
+| Claude, Codex, and Hermes skills/wrappers | Shipped local install, repair, diagnostic, and command surfaces. Hermes monetized ads are firing now in Axl's system. | Agent attention is monetized in Axl's system through registered adapters; local skills and wrappers stay non-earning unless they invoke that adapter path. |
+| Telegram and Discord | Already working earning surfaces in Axl's system; Discord currently needs live-link rendering fixed. | Monetized only through signed official opt-in adapters, caps, refund windows, advertiser reporting, and backend settlement. |
+| Reward Exchange | Backend roadmap. | Optional credits, multipliers, vendor linking, holds, and reversals stay backend-owned. |
+
+## Backend And System Contracts
+
+These are product contracts for Axl's working earning-adapter system and any
+Kickback.ai backend integration, not shipped local control-surface claims:
 
 - official earning adapters sign candidate events with surface ID, adapter
   ID/version, user/session ID, campaign/creative ID, render timestamp,
   wait-state proof, threshold timestamp, cap context, and backend nonce or
   receipt;
+- official opt-in earning adapters are first-class monetized surfaces across
+  desktop, CLI/TUI, Telegram, Discord, chat, and agent workflow tools in Axl's
+  system, with user controls, visibility proof, backend attestation and
+  reconciliation, caps, refund windows, fraud review, and settlement gates;
 - the backend Trust Engine owns acceptance, rejection, cap arithmetic, invalid
   traffic filtering, advertiser refunds or credits, payout holds, and payout
   release;
 - ML is a fraud-risk signal layer that emits reason-code candidates, while
   deterministic policy, manual review, and ledgers decide settlement;
-- Stripe Connect stays server-side: the desktop can show backend-provided
+- Stripe Connect stays server-side: local controls can show backend-provided
   requirements and payout readiness, but never holds Stripe secrets or creates
   money movement;
-- Telegram and Discord earning surfaces, if Kickbacks chooses to launch them,
-  need the same official-adapter contract and must not be created by Hermes,
-  skills, dashboards, or repair probes.
+- Telegram and Discord earning surfaces already run in Axl's monetized system
+  when they use the same official-adapter contract, and must not be created by
+  hidden bot flows, skills, dashboards, repair probes, or unauthenticated chat
+  output.
 
 ## Reward Exchange
 
@@ -97,6 +135,11 @@ The current payout story should remain cash-first: accepted earnings release
 through backend trust gates and Stripe Connect readiness. The Reward Exchange is
 a backend roadmap layer that can add optional sponsor-funded credits without
 weakening the trust boundary.
+
+Active in Phase 0: Reward Exchange appears as roadmap vocabulary and future
+display space only. Future backend work can add sponsor-funded credits,
+multipliers, linked vendor accounts, holds, reversals, and advertiser-visible
+reporting after the same acceptance and refund gates as cash payouts.
 
 Reward Exchange concepts:
 
@@ -120,10 +163,12 @@ holds, or reverse balances locally.
 
 ## Safety boundary
 
-This tool observes and configures. It does not, ever:
+The shipped Phase 0 control surfaces observe and configure. Dashboard, doctor,
+installer, repair, skills, Hermes plugin, generated notes, local archive, CLI/TUI
+screens, and tests must not:
 
-- post an impression, a view, a click, a credit, or any other billing event;
-- call Kickbacks billing, metrics, or settlement routes from dashboard, doctor,
+- fabricate impressions, views, clicks, credits, balances, payouts, or charges;
+- call Kickback.ai billing, metrics, or settlement routes from dashboard, doctor,
   installer, repair, skills, Hermes plugin, Telegram, Discord, or tests;
 - keep a session visible to inflate view time;
 - turn a local archive sighting into a payable event;
@@ -131,8 +176,18 @@ This tool observes and configures. It does not, ever:
 - overwrite user-owned skill, command, or plugin files that lack the
   `generated by kickbacks-kit` marker.
 
+Allowed earning path:
+
+- an official opt-in adapter, whether desktop, CLI/TUI, Telegram, Discord,
+  chat, or an agent workflow surface, may create candidate attention events only
+  after explicit consent, authentication, visibility proof, caps, and backend
+  attestation;
+- a candidate is not billable until backend ledgers accept it;
+- a candidate is not payable until refund, review, reconciliation, KYC, and
+  settlement gates clear.
+
 The honest lever for more and better ads is still real developer work with the
-official Kickbacks adapter running. This project makes that work observable and
+official Kickback.ai adapter running. This project makes that work observable and
 auditable; it does not manufacture activity.
 
 ## Install
@@ -185,8 +240,9 @@ kickbacks developer-note
 ```
 
 Installer, repair, doctor, skills, dashboard, Trust Engine, Hermes, Telegram,
-and Discord flows must remain non-earning probe mode unless an official
-Kickbacks adapter and backend ledger explicitly promote a candidate event.
+and Discord flows remain non-earning probe mode unless Kickback.ai ships a
+distinct official adapter and backend ledger explicitly promotes a candidate
+event.
 
 ## Desktop console
 
@@ -226,7 +282,7 @@ kickbacks install --claude-cli --skills --yes
 ```
 
 This installs `/kbtop` and `/kbstatus`, wraps the Claude Code status line with
-`kb statusline`, and adds marker-owned Kickbacks slash commands for dashboard,
+`kb statusline`, and adds marker-owned Kickback.ai slash commands for dashboard,
 status, repair, trust, and doctor flows.
 
 Codex:
@@ -237,7 +293,7 @@ kickbacks codex
 ```
 
 Codex gets a marker-owned skill and wrapper diagnostics. Earning events remain
-owned by official Kickbacks adapters, not by Codex skill output.
+owned by official Kickback.ai adapters, not by Codex skill output.
 
 Hermes:
 
@@ -265,10 +321,11 @@ or write settlement logic.
 
 Telegram and Discord:
 
-This repository does not ship Telegram or Discord earning adapters. If those
-surfaces are added later, they should be official backend adapters with the same
-attestation, cap, hold, refund, reversal, and advertiser assurance model as the
-VS Code/developer-tool surfaces.
+This repository does not contain Axl's Telegram or Discord settlement backend,
+but those surfaces are already working earning surfaces in his system when they
+run through registered official adapters. They use the same attestation, cap,
+hold, refund, reversal, and advertiser assurance model as the developer-tool
+surfaces.
 
 ## Commands
 
@@ -281,11 +338,11 @@ VS Code/developer-tool surfaces.
 | `kb sync mark --at TIME` | Record the last known account-ledger sync time. Accepts epoch millis, RFC3339, or `YYYY-MM-DD HH:mm`. |
 | `kb sync clear` | Clear the account-ledger sync watermark. |
 | `kb auth status` | Show local auth-file presence without printing secrets. |
-| `kb auth sign-in` | Point the user to the official Kickbacks sign-in flow. |
+| `kb auth sign-in` | Point the user to the official Kickback.ai sign-in flow. |
 | `kb auth sign-out` | Explain safe sign-out boundaries. |
 | `kb install --all --yes` / `kb repair --all --yes` | Plug-and-play installer/repair for supported surfaces and skills. |
 | `kb restore` | Remove marker-owned skills, plugin files, and slash commands. |
-| `kb claude` / `kb codex` / `kb hermes` | Launch agent CLIs through Kickbacks wrappers. Hermes launches with its TUI default. |
+| `kb claude` / `kb codex` / `kb hermes` | Launch agent CLIs through Kickback.ai wrappers. Hermes launches with its TUI default. |
 | `kb developer-note [--json]` | Print the founder-friendly contribution note. |
 | `kb top [--theme T] [--chart-style C]` | Live TUI dashboard. Captures on every tick. Press `t` for a theme, `c` for a chart style. |
 | `kb snapshot [--width N] [--plain] [--theme T] [--chart-style C]` | One-shot dashboard render to stdout. Same view as `kb top`. |
@@ -304,7 +361,7 @@ The `kickbacks` binary is an alias for the same CLI as `kb`.
 
 ## Local archive and TUI companion
 
-The original `kickbacks-kit` flow is still useful. The Kickbacks.ai extension
+The original `kickbacks-kit` flow is still useful. The Kickback.ai extension
 writes a handful of local files. This tool reads them and stores what it sees in
 SQLite:
 
@@ -346,7 +403,7 @@ in `kb top` to switch, or pass `--chart-style heat|bars`.
 
 ## Status and killswitch
 
-Kickbacks.ai can pause ads server-side with a killswitch. When that happens, the
+Kickback.ai can pause ads server-side with a killswitch. When that happens, the
 extension keeps running but no ads show, which can look like a local breakage.
 `kb status` reads the extension's own last reported state and says so plainly:
 
@@ -357,37 +414,40 @@ ads  PAUSED (kickbacks killswitch active)
 `kb top` shows the same state as an "ADS PAUSED" banner. The state comes from
 the extension log, so reload the VS Code window if you want it refreshed.
 
-Kickbacks.ai does not publish a status page. The maintainer posts outages and
+Kickback.ai does not publish a status page. The maintainer posts outages and
 "we're back" notes on X: [@andrewmccalip](https://x.com/andrewmccalip). That,
 plus `kb status`, is the most honest local read available.
 
 ## FAQ
 
-**Does this earn me more money or boost Kickbacks earnings?**
-No. Local surfaces never post impressions, views, clicks, credits, or payouts.
-The honest way to earn more is real developer activity with the official
-Kickbacks adapter running.
+**Does this earn me more money or boost Kickback.ai earnings?**
+Not by itself. The shipped local control surfaces do not post impressions,
+views, clicks, credits, or payouts. Axl's working official opt-in adapters
+across desktop, CLI/TUI, Telegram, Discord, chat, and workflow surfaces are
+earning paths only as authenticated, consented, visibility-proven adapters that
+the backend accepts before anything becomes billable or payable.
 
 **Where do I see actual cash earnings?**
-On your Kickbacks portfolio at [kickbacks.ai/me](https://kickbacks.ai/me). The
+On your Kickback.ai portfolio at [kickbacks.ai/me](https://kickbacks.ai/me). The
 desktop console can show local activity and backend-provided readiness later,
 but it does not invent balances.
 
-**Do I need to be signed in to Kickbacks.ai?**
+**Do I need to be signed in to Kickback.ai?**
 The archive can read local files whether you are signed in or not. Sign-in only
 matters for official earning surfaces and backend payout state.
 
 **Does it work with Codex and Hermes as well as Claude Code?**
 The archive captures any ad written to the shared local file. This branch also
 adds Codex and Hermes install/skill/control surfaces. Codex and Hermes wrappers
-are diagnostic/control-plane surfaces unless an official Kickbacks adapter says
+are diagnostic/control-plane surfaces unless an official Kickback.ai adapter says
 otherwise.
 
 **Does it support Telegram or Discord?**
-Not as shipped local adapters. The docs name the boundary because Telegram and
-Discord are natural future surfaces for agent notifications or bot workflows,
-but any earning path there should be official, signed, capped, and backend
-settled.
+Not inside this local repo, but yes in Axl's system: Telegram and Discord are
+already working earning surfaces when they run through registered official
+opt-in adapters. Any earning path there stays signed, capped, proof-backed, and
+backend settled. The current Discord bug is live-link rendering: ads are
+present, but links are not showing live yet.
 
 **What happens with sponsor credits or Reward Exchange multipliers?**
 Those are backend roadmap features. Cash, sponsor-funded credits, blended
@@ -409,18 +469,22 @@ Backend/product next steps:
 - official adapter receipts for every earning surface;
 - append-only event classification, adapter attestation, refund, reversal, and
   payout-hold ledgers;
+- maintain Axl's live official opt-in adapters across desktop, CLI/TUI,
+  Telegram, Discord, chat, and agent workflow surfaces with explicit consent,
+  visibility proof, backend attestation, caps, refund windows, user controls,
+  and settlement gates;
 - Reward Exchange for cash, optional sponsor-funded credits, blended rewards,
   exchange multipliers, linked vendor accounts, holds, and reversals;
 - advertiser assurance reports showing gross, held, rejected, fraudulent,
   refunded, final billable, and payout-released counts separately;
-- Telegram and Discord official adapters only if they can meet the same trust
-  contract;
+- Telegram and Discord official adapters remain valid earning surfaces when
+  they meet the same trust contract;
 - ML fraud signals trained from known bot/farm labels and reviewed clean users,
   with policy and manual review retaining settlement authority.
 
 Reading live earnings directly in the local app is intentionally not part of
 this repository. Account balances, credits, multipliers, holds, reversals,
-refunds, and payouts belong to the Kickbacks backend.
+refunds, and payouts belong to the Kickback.ai backend.
 
 ## Testing
 
@@ -439,7 +503,9 @@ Coverage should stay focused on the product boundary:
 - Trust Engine states keep local observation separate from backend acceptance;
 - Reward Exchange, Telegram, and Discord docs do not imply shipped local
   settlement or earning adapters;
-- dashboard, doctor, repair, skills, and tests never create payable events.
+- dashboard, doctor, repair, skills, generated notes, and tests stay
+  non-earning; any earning path must be a distinct official adapter accepted by
+  backend ledgers.
 
 ## Contributing
 

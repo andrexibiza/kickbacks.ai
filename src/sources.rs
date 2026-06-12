@@ -1,9 +1,9 @@
 //! Readers for the kickbacks.ai extension's local artifacts.
 //!
-//! These functions are strictly read-only. The crate never writes to any file
-//! the extension owns, and never emits a network request to any billing
-//! endpoint. We observe what the extension already records; we never
-//! manufacture an impression.
+//! These readers are intentionally read-only. They never write to files the
+//! extension owns and never emit a network request to a billing endpoint. They
+//! observe what the extension already records; they never manufacture an
+//! impression.
 
 use anyhow::{Context, Result};
 use std::fs;

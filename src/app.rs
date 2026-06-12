@@ -12,6 +12,7 @@ use crate::{developer_note, integrations, paths, sync_health, trust_engine, util
 
 pub const DEFAULT_PORT: u16 = 38241;
 const FIGMA_CAPTURE_SCRIPT: &str = "https://mcp.figma.com/mcp/html-to-design/capture.js";
+const FIGMA_CAPTURE_ALLOWED_IN_THIS_BUILD: bool = cfg!(debug_assertions);
 
 #[derive(Debug, Serialize)]
 struct ArchivePayload {
@@ -19,10 +20,6 @@ struct ArchivePayload {
     leaderboard: Vec<crate::archive::AdvertiserStat>,
     recent: Vec<crate::archive::LedgerEvent>,
     activity: Vec<Option<u64>>,
-}
-
-pub fn run(host: String, port: u16, open: bool) -> Result<()> {
-    run_with_bind_policy(host, port, open, false)
 }
 
 pub fn run_with_bind_policy(
@@ -35,7 +32,7 @@ pub fn run_with_bind_policy(
     let listener = TcpListener::bind((host.as_str(), port))
         .with_context(|| format!("binding http://{host}:{port}"))?;
     let url = format!("http://{host}:{port}");
-    println!("kickbacks desktop console listening on {url}");
+    println!("Kickback.ai desktop console listening on {url}");
     println!("ledger freshness monitor: {url}/api/health");
     if open {
         open_url(&url);
@@ -77,7 +74,7 @@ fn validate_bind_host(host: &str, allow_unsafe_public_bind: bool) -> Result<()> 
         return Ok(());
     }
     bail!(
-        "refusing to bind Kickbacks desktop console to non-loopback host '{host}'; expose it only through an explicit unsafe public-bind flag"
+        "refusing to bind Kickback.ai desktop console to non-loopback host '{host}'; expose it only through an explicit unsafe public-bind flag"
     );
 }
 
@@ -161,7 +158,7 @@ fn api_payload(path: &str) -> Result<Option<serde_json::Value>> {
             let stats = archive.stats(util::now_ms())?;
             json!({
                 "source": "local_archive_plus_account_sync_monitor",
-                "note": "Actual account earnings are backend-owned. This local app does not invent balances.",
+                "note": "Actual account earnings are backend-owned. Official opt-in earning adapters may exist across CLI/TUI, desktop, Telegram, Discord, and future workflow surfaces; this local app does not invent balances.",
                 "portfolio_url": crate::render::PORTFOLIO_URL,
                 "stats": stats,
                 "sync": sync_health::current(&archive)?,
@@ -218,14 +215,15 @@ fn dashboard_html(capture_enabled: bool) -> String {
 }
 
 fn figma_capture_enabled() -> bool {
-    std::env::var("KICKBACKS_APP_FIGMA_CAPTURE")
-        .map(|value| {
-            matches!(
-                value.to_ascii_lowercase().as_str(),
-                "1" | "true" | "yes" | "dev"
-            )
-        })
-        .unwrap_or(false)
+    FIGMA_CAPTURE_ALLOWED_IN_THIS_BUILD
+        && std::env::var("KICKBACKS_APP_FIGMA_CAPTURE")
+            .map(|value| {
+                matches!(
+                    value.to_ascii_lowercase().as_str(),
+                    "1" | "true" | "yes" | "dev"
+                )
+            })
+            .unwrap_or(false)
 }
 
 fn content_security_policy(capture_enabled: bool) -> &'static str {
@@ -280,12 +278,12 @@ const INDEX_HTML: &str = r###"<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Kickbacks.ai Trust Console</title>
+  <title>Kickback.ai Trust Console</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
   <aside class="rail">
-    <div class="brand"><span class="mark">K$</span><strong>Kickbacks.ai</strong></div>
+    <div class="brand"><span class="mark">K$</span><strong>Kickback.ai</strong></div>
     <nav>
       <a class="active" href="#dashboard">Local Ledger</a>
       <a href="#sync">Sync Monitor</a>
@@ -304,10 +302,11 @@ const INDEX_HTML: &str = r###"<!doctype html>
     <header class="topbar">
       <div>
         <span class="overline">Local desktop console</span>
-        <h1>Trust console for real earning surfaces</h1>
+        <h1>Trust console for opt-in earning surfaces</h1>
       </div>
       <div class="top-status">
         <span id="sync-pill" class="pill">Loading local sync</span>
+        <span class="pill">Backend settles</span>
         <span class="pill">No light mode</span>
       </div>
     </header>
@@ -316,7 +315,7 @@ const INDEX_HTML: &str = r###"<!doctype html>
       <div>
         <span class="overline">Local/backend boundary</span>
         <h2 id="sync-title">Checking account ledger freshness</h2>
-        <p id="sync-message">Reading local adapter sends, auth health, and visible account ledger watermark. This app observes; the backend settles.</p>
+        <p id="sync-message">Reading local adapter sends, auth health, and visible account ledger watermark. The app observes, official adapters attest, and the backend settles.</p>
       </div>
       <div class="incident-grid">
         <div><span>Last adapter send</span><strong id="last-metric">--</strong></div>
@@ -487,6 +486,7 @@ body {
   padding: 24px 18px;
 }
 .brand { display: flex; align-items: center; gap: 12px; color: var(--text); font-size: 15px; }
+.brand strong, h1, h2, p, li, nav a { overflow-wrap: anywhere; }
 .mark { border: 1px solid rgba(126,230,184,.5); border-radius: 6px; padding: 4px 6px; color: var(--mint); background: rgba(126,230,184,.08); }
 nav { display: grid; gap: 2px; margin-top: 36px; }
 nav a { color: var(--quiet); text-decoration: none; padding: 10px 0 10px 12px; border-left: 1px solid transparent; }
@@ -496,17 +496,19 @@ nav a.active, nav a:hover { color: var(--text); border-left-color: var(--mint); 
 .mini-row:last-child, .row:last-child { border-bottom: 0; }
 .mini-row strong { color: var(--text); font-weight: 600; }
 main { margin-left: 238px; padding: 26px 30px 52px; max-width: 1220px; }
-.topbar { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
+.topbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; margin-bottom: 24px; min-width: 0; }
+.topbar > div, .section-head > div { min-width: 0; }
 h1, h2 { margin: 0; letter-spacing: 0; line-height: 1.1; }
 h1 { font-size: 30px; font-weight: 650; }
 h2 { font-size: 18px; font-weight: 650; }
 .overline { color: var(--quiet); text-transform: uppercase; letter-spacing: .12em; font: 700 10px/1.2 ui-monospace, SFMono-Regular, Consolas, monospace; }
-.top-status { display: flex; gap: 10px; align-items: center; }
-.pill { border: 1px solid var(--soft-line); border-radius: 999px; padding: 7px 10px; color: var(--muted); background: rgba(14,23,26,.62); font: 12px ui-monospace, SFMono-Regular, Consolas, monospace; }
+.top-status { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; align-items: center; }
+.pill { border: 1px solid var(--soft-line); border-radius: 999px; padding: 7px 10px; color: var(--muted); background: rgba(14,23,26,.62); font: 12px ui-monospace, SFMono-Regular, Consolas, monospace; overflow-wrap: anywhere; }
 .pill.ok { color: var(--mint); border-color: rgba(126,230,184,.32); }
 .pill.warning { color: var(--amber); border-color: rgba(214,164,81,.36); }
 .pill.critical { color: var(--red); border-color: rgba(230,106,122,.42); }
 .panel {
+  min-width: 0;
   border: 1px solid var(--soft-line);
   border-radius: 8px;
   background: rgba(11, 17, 19, .82);
@@ -582,13 +584,14 @@ button:hover { border-color: rgba(126,230,184,.46); color: var(--mint); }
 .code-list { font: 12px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace; color: var(--text); }
 ul { margin: 14px 0 0; padding-left: 18px; color: var(--muted); }
 li { margin: 8px 0; }
-.toast { position: fixed; right: 24px; bottom: 24px; max-width: 520px; border: 1px solid rgba(138,199,216,.42); border-radius: 8px; padding: 14px 16px; background: #081012; color: var(--text); box-shadow: 0 18px 50px rgba(0,0,0,.25); }
+.toast { position: fixed; right: 16px; bottom: 16px; width: min(520px, calc(100vw - 32px)); border: 1px solid rgba(138,199,216,.42); border-radius: 8px; padding: 14px 16px; background: #081012; color: var(--text); box-shadow: 0 18px 50px rgba(0,0,0,.25); overflow-wrap: anywhere; }
 @media (max-width: 980px) {
   .rail { position: static; width: auto; border-right: 0; border-bottom: 1px solid var(--line); }
   .system-mini { position: static; margin-top: 20px; }
   main { margin-left: 0; padding: 18px; }
   .topbar, .incident { grid-template-columns: 1fr; display: grid; }
-  .kpis, .grid, .trust-grid, .trust-columns, .note-layout, .note-columns { grid-template-columns: 1fr; }
+  .top-status { justify-content: flex-start; }
+  .kpis, .grid, .incident-grid, .stripe-grid, .trust-grid, .trust-columns, .note-layout, .note-columns { grid-template-columns: 1fr; }
   .section-head { flex-wrap: wrap; align-items: flex-start; }
   .table .row, .trust-table .row { grid-template-columns: 1fr; gap: 2px; align-items: start; }
   button { white-space: normal; text-align: left; }
@@ -758,8 +761,10 @@ mod tests {
         LOCK.get_or_init(|| Mutex::new(()))
     }
 
-    fn with_isolated_app_env<T>(f: impl FnOnce() -> T) -> T {
-        let _guard = env_lock().lock().unwrap();
+    fn with_isolated_app_env<T>(f: impl FnOnce() -> T + std::panic::UnwindSafe) -> T {
+        let _guard = env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let root = std::env::temp_dir().join(format!(
             "kickbacks-app-test-{}-{}",
             std::process::id(),
@@ -774,12 +779,15 @@ mod tests {
         std::env::set_var("KICKBACKS_KIT_DB", &db);
         std::env::set_var("KICKBACKS_VIBE_DIR", &vibe);
         std::env::remove_var("KICKBACKS_APP_FIGMA_CAPTURE");
-        let out = f();
+        let out = std::panic::catch_unwind(f);
         restore_env("KICKBACKS_KIT_DB", old_db);
         restore_env("KICKBACKS_VIBE_DIR", old_vibe);
         restore_env("KICKBACKS_APP_FIGMA_CAPTURE", old_figma);
         let _ = std::fs::remove_dir_all(root);
-        out
+        match out {
+            Ok(value) => value,
+            Err(panic) => std::panic::resume_unwind(panic),
+        }
     }
 
     fn restore_env(key: &str, value: Option<std::ffi::OsString>) {
@@ -798,13 +806,23 @@ mod tests {
             handle(stream).unwrap();
         });
         let mut client = TcpStream::connect(addr).unwrap();
+        client.set_read_timeout(Some(Duration::from_secs(10))).ok();
         write!(
             client,
             "{method} {target} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
         )
         .unwrap();
+        client.flush().unwrap();
         let mut response = String::new();
-        client.read_to_string(&mut response).unwrap();
+        match client.read_to_string(&mut response) {
+            Ok(_) => {}
+            Err(err)
+                if matches!(
+                    err.kind(),
+                    std::io::ErrorKind::ConnectionReset | std::io::ErrorKind::ConnectionAborted
+                ) && !response.is_empty() => {}
+            Err(err) => panic!("failed to read response: {err}"),
+        }
         server.join().unwrap();
         response
     }
@@ -815,6 +833,8 @@ mod tests {
 
     #[test]
     fn html_has_required_product_surfaces() {
+        assert!(INDEX_HTML.contains("Kickback.ai"));
+        assert!(!INDEX_HTML.contains("Kickbacks.ai"));
         assert!(INDEX_HTML.contains("Local/backend boundary"));
         assert!(INDEX_HTML.contains("Checking account ledger freshness"));
         assert!(INDEX_HTML.contains("Trust Engine"));
@@ -823,7 +843,7 @@ mod tests {
         assert!(INDEX_HTML.contains("Stripe Connect"));
         assert!(INDEX_HTML.contains("Founder note"));
         assert!(INDEX_HTML.contains("No light mode"));
-        assert!(INDEX_HTML.contains("Trust console for real earning surfaces"));
+        assert!(INDEX_HTML.contains("Trust console for opt-in earning surfaces"));
         assert!(INDEX_HTML.contains("Backend-owned"));
         assert!(!INDEX_HTML.contains("Revenue Console"));
         assert!(!INDEX_HTML.contains("Market pulse"));
@@ -871,6 +891,16 @@ mod tests {
 
     #[test]
     fn figma_capture_requires_explicit_dev_gate() {
+        let _guard = env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let old_figma = std::env::var_os("KICKBACKS_APP_FIGMA_CAPTURE");
+        std::env::remove_var("KICKBACKS_APP_FIGMA_CAPTURE");
+        assert!(!figma_capture_enabled());
+        std::env::set_var("KICKBACKS_APP_FIGMA_CAPTURE", "true");
+        assert_eq!(figma_capture_enabled(), FIGMA_CAPTURE_ALLOWED_IN_THIS_BUILD);
+        restore_env("KICKBACKS_APP_FIGMA_CAPTURE", old_figma);
+
         assert!(!dashboard_html(false).contains(FIGMA_CAPTURE_SCRIPT));
         assert!(!content_security_policy(false).contains("mcp.figma.com"));
         assert!(dashboard_html(true).contains(FIGMA_CAPTURE_SCRIPT));
@@ -903,10 +933,13 @@ mod tests {
             for endpoint in ["install/enable", "install/repair"] {
                 let value = api_payload(endpoint).unwrap().unwrap();
                 let body = serde_json::to_string(&value).unwrap();
+                let metrics_route = format!("/v1/{}", "metrics");
+                let events_route = format!("/v1/{}", "events");
+                let stripe_host = format!("api.{}", "stripe.com");
                 assert!(body.contains("Run the CLI installer from a trusted terminal"));
-                assert!(!body.contains("/v1/metrics"));
-                assert!(!body.contains("/v1/events"));
-                assert!(!body.contains("api.stripe.com"));
+                assert!(!body.contains(&metrics_route));
+                assert!(!body.contains(&events_route));
+                assert!(!body.contains(&stripe_host));
             }
             assert!(api_payload("missing").unwrap().is_none());
         });
@@ -915,12 +948,20 @@ mod tests {
     #[test]
     fn http_routes_unknown_api_to_404_and_non_get_to_405() {
         with_isolated_app_env(|| {
-            let health = request("GET", "/api/health");
-            assert!(health.starts_with("HTTP/1.1 200 OK"));
-            serde_json::from_str::<serde_json::Value>(body(&health)).unwrap();
+            let known = request("GET", "/api/install/enable");
+            assert!(
+                known.starts_with("HTTP/1.1 200 OK"),
+                "known API route returned {known}"
+            );
+            assert!(
+                known.contains("Content-Type: application/json; charset=utf-8"),
+                "known API route did not return JSON headers: {known}"
+            );
+            serde_json::from_str::<serde_json::Value>(body(&known)).unwrap();
 
             let unknown = request("GET", "/api/not-real");
             assert!(unknown.starts_with("HTTP/1.1 404 Not Found"));
+            assert!(unknown.contains("Content-Type: application/json; charset=utf-8"));
             serde_json::from_str::<serde_json::Value>(body(&unknown)).unwrap();
 
             let post = request("POST", "/api/health");

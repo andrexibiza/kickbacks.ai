@@ -324,7 +324,7 @@ fn keybinds_line(pal: &Palette, theme: Theme, chart: ChartStyle) -> Line<'static
 
 fn ethic_line(pal: &Palette) -> Line<'static> {
     Line::from(Span::styled(
-        " local archive · cloud earnings stay on Kickbacks.ai ",
+        " local archive · cloud earnings stay on Kickback.ai ",
         fg(pal.dim).add_modifier(Modifier::ITALIC),
     ))
 }
@@ -482,7 +482,7 @@ fn render_totals(frame: &mut Frame, area: Rect, app: &App) {
     lines.push(Line::from(vec![
         Span::styled("earnings cockpit  ", fg(pal.dim)),
         Span::styled(
-            "open Kickbacks.ai",
+            "open Kickback.ai",
             fg(pal.gold).add_modifier(Modifier::BOLD),
         ),
     ]));

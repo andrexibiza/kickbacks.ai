@@ -1,11 +1,11 @@
-//! Two-way trust ledger for Kickbacks.
+//! Two-way trust ledger for Kickback.ai.
 //!
-//! The desktop app needs to prove two things at once:
+//! Local Kickback.ai surfaces need to prove two things at once:
 //! developers can see why their real local activity is or is not syncing, and
 //! advertisers can see why billed attention is protected from bots, click farms,
-//! probe traffic, and payout abuse. This module is deliberately read-only. It
-//! classifies local evidence and names backend-required signals, but it never
-//! creates earning events.
+//! probe traffic, and payout abuse. This module classifies local evidence,
+//! permits opt-in official adapter candidates, and names backend-required
+//! settlement gates. It does not turn local observations or probes into money.
 
 use anyhow::Result;
 use serde::Serialize;
@@ -108,6 +108,7 @@ pub struct TrustBoundary {
     pub owner: &'static str,
     pub evidence: Vec<&'static str>,
     pub allowed_to_advance: &'static str,
+    pub can_create_billable_event: bool,
     pub can_make_payable: bool,
     pub failure_mode: &'static str,
 }
@@ -155,7 +156,7 @@ pub struct TrustTransitionRule {
     pub to: TrustEventState,
     pub owner: &'static str,
     pub required_evidence: &'static str,
-    pub can_be_initiated_by_desktop: bool,
+    pub can_be_initiated_by_local_surface: bool,
     pub creates_billable_event: bool,
     pub creates_payable_event: bool,
 }
@@ -258,7 +259,7 @@ pub struct EventStateBucket {
     pub local_count: Option<i64>,
     pub can_bill_advertiser: bool,
     pub can_pay_developer: bool,
-    pub local_desktop_authority: &'static str,
+    pub local_surface_authority: &'static str,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -276,6 +277,8 @@ pub struct SurfaceAttestation {
     pub backend_attestation_verified: bool,
     pub can_earn: bool,
     pub can_observe: bool,
+    pub can_create_earning_candidates: bool,
+    pub can_enter_backend_acceptance_gates: bool,
     pub can_create_billable_events: bool,
     pub can_create_payable_events: bool,
     pub probe_mode_available: bool,
@@ -381,9 +384,9 @@ pub fn current(archive: &Archive) -> Result<TrustEngineSnapshot> {
     );
 
     Ok(TrustEngineSnapshot {
-        title: "Kickbacks Trust Engine",
-        pitch: "Official adapters create earning candidates; backend ledgers decide settlement; ML contributes data points, not payout authority.",
-        mode: "read-only local trust ledger plus backend-required fraud contract",
+        title: "Kickback.ai Trust Engine",
+        pitch: "Opt-in official adapters create earning candidates; backend ledgers decide settlement; ML contributes data points, not payout authority.",
+        mode: "local trust ledger plus opt-in official adapter candidate contract",
         trust_boundaries: trust_boundaries(),
         backend_owned_boundaries: backend_owned_boundaries(),
         settlement_gates: settlement_gates(&sync, official_earning_surface_count),
@@ -399,7 +402,7 @@ pub fn current(archive: &Archive) -> Result<TrustEngineSnapshot> {
             status: if held_for_sync_review > 0 {
                 "ledger_visibility_review"
             } else {
-                "local_only_no_billing_claim"
+                "local_only_no_backend_billing_claim"
             },
             local_visible_non_billable: stats.total_sightings,
             held_for_sync_review,
@@ -440,7 +443,7 @@ pub fn current(archive: &Archive) -> Result<TrustEngineSnapshot> {
             enabled: true,
             event_state: "probe_non_earning",
             can_create_payable_events: false,
-            statement: "Install, repair, doctor, skills, dashboard, and Trust Engine flows are probe-only: they can validate setup without creating payable events.",
+            statement: "Install, repair, doctor, skills, dashboard, and Trust Engine flows are probe-only: they can validate setup without creating earning candidates, billing, or payable events.",
             safe_commands: vec![
                 "kickbacks doctor",
                 "kickbacks sync status",
@@ -451,7 +454,7 @@ pub fn current(archive: &Archive) -> Result<TrustEngineSnapshot> {
         },
         safety_policy: SafetyPolicy {
             earning_integrity_invariant:
-                "Only official earning adapters may report eligible impressions, views, or clicks. Everything else is read-only observation, diagnosis, or non-earning probe mode.",
+                "An opt-in official earning adapter may report candidate impressions, views, or clicks for backend acceptance gates. Local observation, dashboards, diagnosis, repair, and probes remain non-earning.",
             official_adapters_only: true,
             dashboard_may_read: vec![
                 "local archive",
@@ -461,8 +464,8 @@ pub fn current(archive: &Archive) -> Result<TrustEngineSnapshot> {
                 "backend-provided trust summaries",
             ],
             dashboard_must_not: vec![
-                "post metrics",
-                "retry earning events",
+                "post unauthenticated metrics",
+                "retry earning events outside the official adapter path",
                 "hold Stripe secrets",
                 "create charges",
                 "fabricate impressions",
@@ -487,9 +490,7 @@ fn held_for_sync_review_count(sync: &sync_health::SyncHealth) -> usize {
 }
 
 fn is_official_earning_adapter(item: &integrations::IntegrationStatus) -> bool {
-    item.id == "vscode"
-        && item.detected
-        && matches!(&item.capability, integrations::IntegrationCapability::Earn)
+    item.detected && matches!(&item.capability, integrations::IntegrationCapability::Earn)
 }
 
 fn risk_score<const N: usize>(base: u8, additions: [(bool, u8); N]) -> u8 {
@@ -586,7 +587,7 @@ fn backend_owned_boundaries() -> Vec<BackendOwnedBoundary> {
         BackendOwnedBoundary {
             decision: "adapter_receipt_acceptance",
             why_backend_owned:
-                "server nonce, adapter signing keys, duplicate rejection, and replay defense are not knowable from the desktop archive",
+                "server nonce, adapter signing keys, duplicate rejection, and replay defense are not knowable from a local archive",
             local_snapshot_policy:
                 "show adapter candidates only; never treat a local render or log line as accepted",
         },
@@ -595,7 +596,7 @@ fn backend_owned_boundaries() -> Vec<BackendOwnedBoundary> {
             why_backend_owned:
                 "campaign budget, exposure ceilings, advertiser contracts, and accepted-event ledgers live on the backend",
             local_snapshot_policy:
-                "do not create, retry, or imply payable/billing events from dashboard, doctor, repair, skills, or trust views",
+                "opt-in official adapters may submit candidate receipts from any approved surface; dashboard, doctor, repair, skills, and trust views must not create, retry, or imply payable/billing events",
         },
         BackendOwnedBoundary {
             decision: "cap_and_velocity_enforcement",
@@ -623,7 +624,7 @@ fn backend_owned_boundaries() -> Vec<BackendOwnedBoundary> {
             why_backend_owned:
                 "Stripe/KYC/1099 readiness, held balances, refund buffers, and payout schedules are backend plus Stripe Connect concerns",
             local_snapshot_policy:
-                "hold claims at the trust boundary; never let desktop state release or promise funds",
+                "hold claims at the trust boundary; never let local surface state release or promise funds",
         },
     ]
 }
@@ -632,20 +633,22 @@ fn trust_boundaries() -> Vec<TrustBoundary> {
     vec![
         TrustBoundary {
             stage: "local_observation",
-            owner: "desktop app / local archive",
+            owner: "local app / local archive",
             evidence: vec![
                 "cli-ad.json creative",
                 "debug.log lifecycle tail",
                 "archive sighting row",
             ],
             allowed_to_advance: "visible_but_non_billable only",
+            can_create_billable_event: false,
             can_make_payable: false,
             failure_mode: "Local archive is useful proof for the user, but cannot bill an advertiser.",
         },
         TrustBoundary {
             stage: "official_adapter_attestation",
-            owner: "Kickbacks earning adapter",
+            owner: "Kickback.ai opt-in official earning adapter",
             evidence: vec![
+                "user earning opt-in",
                 "adapter identity",
                 "adapter version",
                 "surface id",
@@ -654,14 +657,15 @@ fn trust_boundaries() -> Vec<TrustBoundary> {
                 "monotonic sequence",
                 "server nonce or signed receipt",
             ],
-            allowed_to_advance: "eligible or eligible_but_capped candidate",
+            allowed_to_advance: "candidate_adapter_attested for backend gates",
+            can_create_billable_event: false,
             can_make_payable: false,
             failure_mode:
-                "An adapter can prove a candidate event, but payability still waits for backend caps and fraud checks.",
+                "An opt-in official adapter can prove a candidate event from an approved surface, but billing and payability still wait for backend caps, attestation, and fraud checks.",
         },
         TrustBoundary {
             stage: "backend_acceptance",
-            owner: "Kickbacks backend trust service",
+            owner: "Kickback.ai backend trust service",
             evidence: vec![
                 "account/session graph",
                 "IP/ASN/device cluster checks",
@@ -671,13 +675,14 @@ fn trust_boundaries() -> Vec<TrustBoundary> {
                 "duplicate-event rejection",
             ],
             allowed_to_advance: "billable, held_for_review, rejected, or fraudulent",
-            can_make_payable: true,
+            can_create_billable_event: true,
+            can_make_payable: false,
             failure_mode:
                 "Without backend acceptance, a local or adapter event must remain non-payable or held.",
         },
         TrustBoundary {
             stage: "advertiser_settlement",
-            owner: "Kickbacks billing/refund ledger",
+            owner: "Kickback.ai billing/refund ledger",
             evidence: vec![
                 "eligible event ledger",
                 "rejected event ledger",
@@ -686,13 +691,14 @@ fn trust_boundaries() -> Vec<TrustBoundary> {
                 "campaign spend ceiling",
             ],
             allowed_to_advance: "invoiceable or refundable advertiser ledger row",
+            can_create_billable_event: false,
             can_make_payable: false,
             failure_mode:
                 "Advertisers need gross, filtered, rejected, refunded, and final billable counts split apart.",
         },
         TrustBoundary {
             stage: "stripe_payout_finality",
-            owner: "Kickbacks backend plus Stripe Connect",
+            owner: "Kickback.ai backend plus Stripe Connect",
             evidence: vec![
                 "Connect account requirements",
                 "KYC status",
@@ -702,7 +708,8 @@ fn trust_boundaries() -> Vec<TrustBoundary> {
                 "1099/reporting state",
             ],
             allowed_to_advance: "developer payout release",
-            can_make_payable: false,
+            can_create_billable_event: false,
+            can_make_payable: true,
             failure_mode:
                 "Stripe payout readiness is downstream of accepted earning and cannot repair trust gaps.",
         },
@@ -741,7 +748,7 @@ fn settlement_gates(
         SettlementGate {
             gate: "official_adapter_only",
             required_evidence:
-                "Event came from an approved earning adapter, not dashboard/skill/repair code.",
+                "Event came from an approved opt-in earning adapter, not dashboard/skill/repair/probe code.",
             local_status: adapter_local_status,
             backend_status: "must verify adapter id/version/signature",
             blocks_payout: true,
@@ -787,7 +794,7 @@ fn settlement_gates(
 
 fn finality_model() -> FinalityModel {
     FinalityModel {
-        invariant: "No event can become payable from local observation, installer probe, dashboard state, skill output, repair flow, or unauthenticated adapter telemetry.",
+        invariant: "Opt-in official earning adapters may create earning candidates from approved CLI/TUI, desktop, messaging, or workflow surfaces for backend acceptance gates. No event can become payable from local observation, installer probe, dashboard state, skill output, repair flow, bot/status message, or unauthenticated adapter telemetry.",
         payable_state: "accepted_billable_after_refund_window",
         billing_state_machine: vec![
             BillingState {
@@ -800,7 +807,7 @@ fn finality_model() -> FinalityModel {
             },
             BillingState {
                 state: "observed_local",
-                owner: "desktop archive",
+                owner: "local archive",
                 meaning: "A creative was observed locally; useful to the user, not billable, and unable to advance itself.",
                 can_bill_advertiser: false,
                 can_pay_developer: false,
@@ -808,8 +815,8 @@ fn finality_model() -> FinalityModel {
             },
             BillingState {
                 state: "candidate_adapter_attested",
-                owner: "official earning adapter",
-                meaning: "Adapter claims render/wait-state threshold with official identity.",
+                owner: "opt-in official earning adapter",
+                meaning: "Adapter claims user opt-in, render/wait-state threshold, official identity, and signed receipt.",
                 can_bill_advertiser: false,
                 can_pay_developer: false,
                 next_allowed: vec![
@@ -920,7 +927,7 @@ fn finality_model() -> FinalityModel {
             HardStopRule {
                 rule: "stripe_kyc_or_1099_incomplete",
                 action: "hold_payout_not_event_acceptance",
-                final_until: "Stripe/Kickbacks payout requirements are complete",
+                final_until: "Stripe/Kickback.ai payout requirements are complete",
             },
         ],
         finality_rules: vec![
@@ -928,7 +935,7 @@ fn finality_model() -> FinalityModel {
             "Every event keeps a terminal reason: paid, capped, rejected, fraudulent, refunded, or held.",
             "Refund windows and payout holds protect advertisers before developer payout finality.",
             "Manual review can release holds but must preserve the reason ledger.",
-            "Dashboard and skills are never settlement authorities.",
+            "Official opt-in adapters create candidates only; dashboard, skills, repair, doctor, and plain bot/status flows are never settlement authorities.",
         ],
     }
 }
@@ -940,16 +947,26 @@ fn trust_transition_rules() -> Vec<TrustTransitionRule> {
             to: TrustEventState::ProbeNonEarning,
             owner: "installer / repair / doctor / dashboard / skill",
             required_evidence: "probe origin marker",
-            can_be_initiated_by_desktop: true,
+            can_be_initiated_by_local_surface: true,
             creates_billable_event: false,
             creates_payable_event: false,
         },
         TrustTransitionRule {
             from: TrustEventState::ObservedLocal,
             to: TrustEventState::ObservedLocal,
-            owner: "desktop archive",
+            owner: "local archive",
             required_evidence: "local sighting row only",
-            can_be_initiated_by_desktop: true,
+            can_be_initiated_by_local_surface: true,
+            creates_billable_event: false,
+            creates_payable_event: false,
+        },
+        TrustTransitionRule {
+            from: TrustEventState::CandidateAdapterAttested,
+            to: TrustEventState::CandidateAdapterAttested,
+            owner: "opt-in official earning adapter",
+            required_evidence:
+                "user opt-in, official adapter id/version, wait-state proof, threshold proof, and signed receipt",
+            can_be_initiated_by_local_surface: true,
             creates_billable_event: false,
             creates_payable_event: false,
         },
@@ -958,7 +975,7 @@ fn trust_transition_rules() -> Vec<TrustTransitionRule> {
             to: TrustEventState::HeldForReview,
             owner: "backend trust service",
             required_evidence: "adapter receipt plus unresolved sync, cap, cluster, or refund-window evidence",
-            can_be_initiated_by_desktop: false,
+            can_be_initiated_by_local_surface: false,
             creates_billable_event: false,
             creates_payable_event: false,
         },
@@ -967,7 +984,7 @@ fn trust_transition_rules() -> Vec<TrustTransitionRule> {
             to: TrustEventState::EligibleButCapped,
             owner: "backend cap and velocity engine",
             required_evidence: "valid attention beyond a campaign, account, surface, or trust-tier cap",
-            can_be_initiated_by_desktop: false,
+            can_be_initiated_by_local_surface: false,
             creates_billable_event: false,
             creates_payable_event: false,
         },
@@ -977,7 +994,7 @@ fn trust_transition_rules() -> Vec<TrustTransitionRule> {
             owner: "backend trust service",
             required_evidence:
                 "signed adapter receipt, duplicate rejection, caps, cluster checks, and campaign exposure limits",
-            can_be_initiated_by_desktop: false,
+            can_be_initiated_by_local_surface: false,
             creates_billable_event: true,
             creates_payable_event: false,
         },
@@ -986,7 +1003,7 @@ fn trust_transition_rules() -> Vec<TrustTransitionRule> {
             to: TrustEventState::Rejected,
             owner: "backend trust service",
             required_evidence: "policy violation, missing proof, duplicate, replay, or failed validation",
-            can_be_initiated_by_desktop: false,
+            can_be_initiated_by_local_surface: false,
             creates_billable_event: false,
             creates_payable_event: false,
         },
@@ -995,7 +1012,7 @@ fn trust_transition_rules() -> Vec<TrustTransitionRule> {
             to: TrustEventState::Fraudulent,
             owner: "backend trust service",
             required_evidence: "confirmed bot, farm, replay, click-farm, or invalid-traffic evidence",
-            can_be_initiated_by_desktop: false,
+            can_be_initiated_by_local_surface: false,
             creates_billable_event: false,
             creates_payable_event: false,
         },
@@ -1004,7 +1021,7 @@ fn trust_transition_rules() -> Vec<TrustTransitionRule> {
             to: TrustEventState::BackendAccepted,
             owner: "backend trust service or manual review",
             required_evidence: "auditable hold release with preserved reason history",
-            can_be_initiated_by_desktop: false,
+            can_be_initiated_by_local_surface: false,
             creates_billable_event: true,
             creates_payable_event: false,
         },
@@ -1013,7 +1030,7 @@ fn trust_transition_rules() -> Vec<TrustTransitionRule> {
             to: TrustEventState::Rejected,
             owner: "backend trust service or manual review",
             required_evidence: "auditable rejection reason",
-            can_be_initiated_by_desktop: false,
+            can_be_initiated_by_local_surface: false,
             creates_billable_event: false,
             creates_payable_event: false,
         },
@@ -1022,7 +1039,7 @@ fn trust_transition_rules() -> Vec<TrustTransitionRule> {
             to: TrustEventState::Fraudulent,
             owner: "backend trust service or manual review",
             required_evidence: "auditable fraud or invalid-traffic reason",
-            can_be_initiated_by_desktop: false,
+            can_be_initiated_by_local_surface: false,
             creates_billable_event: false,
             creates_payable_event: false,
         },
@@ -1031,7 +1048,7 @@ fn trust_transition_rules() -> Vec<TrustTransitionRule> {
             to: TrustEventState::AcceptedBillableAfterRefundWindow,
             owner: "billing and payout ledger",
             required_evidence: "refund window, payout holds, KYC/1099, and Connect requirements cleared",
-            can_be_initiated_by_desktop: false,
+            can_be_initiated_by_local_surface: false,
             creates_billable_event: false,
             creates_payable_event: true,
         },
@@ -1040,7 +1057,7 @@ fn trust_transition_rules() -> Vec<TrustTransitionRule> {
             to: TrustEventState::Refunded,
             owner: "billing and refund ledger",
             required_evidence: "invalid, reversed, disputed, or adjusted billed traffic",
-            can_be_initiated_by_desktop: false,
+            can_be_initiated_by_local_surface: false,
             creates_billable_event: false,
             creates_payable_event: false,
         },
@@ -1049,7 +1066,7 @@ fn trust_transition_rules() -> Vec<TrustTransitionRule> {
             to: TrustEventState::Rejected,
             owner: "backend trust service or manual review",
             required_evidence: "late validation failure before payout finality",
-            can_be_initiated_by_desktop: false,
+            can_be_initiated_by_local_surface: false,
             creates_billable_event: false,
             creates_payable_event: false,
         },
@@ -1058,7 +1075,7 @@ fn trust_transition_rules() -> Vec<TrustTransitionRule> {
             to: TrustEventState::Fraudulent,
             owner: "backend trust service or manual review",
             required_evidence: "late fraud or invalid-traffic decision before payout finality",
-            can_be_initiated_by_desktop: false,
+            can_be_initiated_by_local_surface: false,
             creates_billable_event: false,
             creates_payable_event: false,
         },
@@ -1067,7 +1084,7 @@ fn trust_transition_rules() -> Vec<TrustTransitionRule> {
             to: TrustEventState::Paid,
             owner: "Stripe Connect payout flow",
             required_evidence: "backend payout release instruction after all holds clear",
-            can_be_initiated_by_desktop: false,
+            can_be_initiated_by_local_surface: false,
             creates_billable_event: false,
             creates_payable_event: true,
         },
@@ -1076,7 +1093,7 @@ fn trust_transition_rules() -> Vec<TrustTransitionRule> {
             to: TrustEventState::Refunded,
             owner: "billing and refund ledger",
             required_evidence: "post-acceptance adjustment with advertiser credit and payout clawback policy",
-            can_be_initiated_by_desktop: false,
+            can_be_initiated_by_local_surface: false,
             creates_billable_event: false,
             creates_payable_event: false,
         },
@@ -1089,7 +1106,7 @@ fn advertiser_assurance_report() -> AdvertiserAssuranceReport {
         proof_standard:
             "Show filtered, rejected, held, refunded, and final billable reach separately; never collapse them into one opaque impression count.",
         public_claim:
-            "Kickbacks should filter invalid traffic before payout finality and give advertisers an auditable reason ledger for every non-billable or refunded event.",
+            "Kickback.ai should filter invalid traffic before payout finality and give advertisers an auditable reason ledger for every non-billable or refunded event.",
         required_tables: vec![
             AssuranceTable {
                 table: "event_classification_ledger",
@@ -1175,7 +1192,7 @@ fn advertiser_assurance_report() -> AdvertiserAssuranceReport {
         control_evidence: vec![
             ControlEvidence {
                 control: "official_adapter_only",
-                evidence: "Adapter id/version/signature plus server nonce; dashboard and repair code paths cannot post metrics.",
+                evidence: "Adapter id/version/signature plus server nonce; dashboard and repair code paths cannot post earning receipts unless they are the signed opt-in adapter for that surface.",
                 advertiser_visible: true,
             },
             ControlEvidence {
@@ -1301,7 +1318,7 @@ fn ml_signal_layer() -> MlSignalLayer {
         authority_boundary:
             "ML outputs are data points and reason-code candidates. Deterministic policy, manual review, and the backend event state machine decide settlement.",
         labeled_training_data:
-            "Known bot accounts and bot events labeled by Kickbacks, when available, should bootstrap supervised training, validation, and precision/recall reporting.",
+            "Known bot accounts and bot events labeled by Kickback.ai, when available, should bootstrap supervised training, validation, and precision/recall reporting.",
         feature_row: vec![
             "account_age",
             "kyc_status",
@@ -1404,7 +1421,7 @@ fn eligibility_buckets(stats: &Stats, held_for_sync_review: usize) -> Vec<Eligib
         EligibilityBucket {
             state: "visible_but_non_billable",
             count: Some(stats.total_sightings),
-            payout_impact: "local proof only; not payable from the desktop archive",
+            payout_impact: "local proof only; not payable from the local archive",
             advertiser_impact: "not billed unless official adapter and backend accept it",
         },
         EligibilityBucket {
@@ -1438,27 +1455,27 @@ fn event_state_buckets(stats: &Stats, held_for_sync_review: usize) -> Vec<EventS
             local_count: None,
             can_bill_advertiser: false,
             can_pay_developer: false,
-            local_desktop_authority: "desktop can create this bucket only; it never upgrades",
+            local_surface_authority: "local probe surfaces can create this bucket only; it never upgrades",
         },
         EventStateBucket {
             state: "observed_local",
             bucket: "local_archive_visibility",
-            owner: "desktop archive",
+            owner: "local archive",
             local_count: Some(stats.total_sightings),
             can_bill_advertiser: false,
             can_pay_developer: false,
-            local_desktop_authority:
-                "desktop can count local observations but cannot promote them to earning candidates",
+            local_surface_authority:
+                "local surfaces can count local observations but cannot promote them to earning candidates",
         },
         EventStateBucket {
             state: "candidate_adapter_attested",
             bucket: "official_adapter_candidate",
-            owner: "official earning adapter",
+            owner: "opt-in official earning adapter",
             local_count: None,
             can_bill_advertiser: false,
             can_pay_developer: false,
-            local_desktop_authority:
-                "desktop may display candidate receipts only when backend or adapter provides them",
+            local_surface_authority:
+                "official opt-in adapter may create candidate receipts from an approved surface; backend owns acceptance",
         },
         EventStateBucket {
             state: "held_for_review",
@@ -1467,8 +1484,8 @@ fn event_state_buckets(stats: &Stats, held_for_sync_review: usize) -> Vec<EventS
             local_count: Some(held_for_sync_review as i64),
             can_bill_advertiser: false,
             can_pay_developer: false,
-            local_desktop_authority:
-                "desktop may recommend a hold for visible lag, but backend owns release",
+            local_surface_authority:
+                "local surfaces may recommend a hold for visible lag, but backend owns release",
         },
         EventStateBucket {
             state: "eligible_but_capped",
@@ -1477,7 +1494,7 @@ fn event_state_buckets(stats: &Stats, held_for_sync_review: usize) -> Vec<EventS
             local_count: None,
             can_bill_advertiser: false,
             can_pay_developer: false,
-            local_desktop_authority: "desktop can name cap policy; backend owns cap arithmetic",
+            local_surface_authority: "local surfaces can name cap policy; backend owns cap arithmetic",
         },
         EventStateBucket {
             state: "backend_accepted",
@@ -1486,7 +1503,7 @@ fn event_state_buckets(stats: &Stats, held_for_sync_review: usize) -> Vec<EventS
             local_count: None,
             can_bill_advertiser: true,
             can_pay_developer: false,
-            local_desktop_authority: "desktop may show backend-provided accepted counts only",
+            local_surface_authority: "local surfaces may show backend-provided accepted counts only",
         },
         EventStateBucket {
             state: "accepted_billable_after_refund_window",
@@ -1495,7 +1512,7 @@ fn event_state_buckets(stats: &Stats, held_for_sync_review: usize) -> Vec<EventS
             local_count: None,
             can_bill_advertiser: true,
             can_pay_developer: true,
-            local_desktop_authority: "desktop may show backend-provided payout-ready counts only",
+            local_surface_authority: "local surfaces may show backend-provided payout-ready counts only",
         },
         EventStateBucket {
             state: "paid",
@@ -1504,7 +1521,7 @@ fn event_state_buckets(stats: &Stats, held_for_sync_review: usize) -> Vec<EventS
             local_count: None,
             can_bill_advertiser: true,
             can_pay_developer: true,
-            local_desktop_authority: "desktop may display Stripe/backend payout status only",
+            local_surface_authority: "local surfaces may display Stripe/backend payout status only",
         },
         EventStateBucket {
             state: "refunded",
@@ -1513,7 +1530,7 @@ fn event_state_buckets(stats: &Stats, held_for_sync_review: usize) -> Vec<EventS
             local_count: None,
             can_bill_advertiser: false,
             can_pay_developer: false,
-            local_desktop_authority: "desktop may display backend-provided refund status only",
+            local_surface_authority: "local surfaces may display backend-provided refund status only",
         },
         EventStateBucket {
             state: "rejected",
@@ -1522,7 +1539,7 @@ fn event_state_buckets(stats: &Stats, held_for_sync_review: usize) -> Vec<EventS
             local_count: None,
             can_bill_advertiser: false,
             can_pay_developer: false,
-            local_desktop_authority: "desktop may display backend-provided rejection reasons only",
+            local_surface_authority: "local surfaces may display backend-provided rejection reasons only",
         },
         EventStateBucket {
             state: "fraudulent",
@@ -1531,7 +1548,7 @@ fn event_state_buckets(stats: &Stats, held_for_sync_review: usize) -> Vec<EventS
             local_count: None,
             can_bill_advertiser: false,
             can_pay_developer: false,
-            local_desktop_authority: "desktop may display backend-provided fraud outcomes only",
+            local_surface_authority: "local surfaces may display backend-provided fraud outcomes only",
         },
     ]
 }
@@ -1577,6 +1594,8 @@ fn surface_attestations(
                 backend_attestation_verified: false,
                 can_earn,
                 can_observe,
+                can_create_earning_candidates: official_adapter,
+                can_enter_backend_acceptance_gates: official_adapter,
                 can_create_billable_events: false,
                 can_create_payable_events: false,
                 probe_mode_available: true,
@@ -1605,7 +1624,7 @@ fn cluster_signals(
         ClusterSignal {
             signal: "many_accounts_same_ip_asn_device",
             severity: "backend_required",
-            local_evidence: "not observable from local desktop archive".to_string(),
+            local_evidence: "not observable from a local archive".to_string(),
             backend_signal_needed: "IP, ASN, device fingerprint, account graph",
         },
         ClusterSignal {
@@ -1659,7 +1678,7 @@ fn cluster_signals(
         ClusterSignal {
             signal: "new_account_high_earnings_velocity",
             severity: "backend_required",
-            local_evidence: "desktop does not know account age or actual payout balance"
+            local_evidence: "local surfaces do not know account age or actual payout balance"
                 .to_string(),
             backend_signal_needed: "account age, Stripe/KYC state, payout velocity",
         },
@@ -1789,7 +1808,15 @@ mod tests {
         assert!(snapshot
             .trust_boundaries
             .iter()
-            .any(|b| b.stage == "backend_acceptance" && b.can_make_payable));
+            .any(|b| b.stage == "backend_acceptance"
+                && b.can_create_billable_event
+                && !b.can_make_payable));
+        assert!(snapshot
+            .trust_boundaries
+            .iter()
+            .any(|b| b.stage == "stripe_payout_finality"
+                && !b.can_create_billable_event
+                && b.can_make_payable));
         assert_eq!(
             snapshot.finality_model.payable_state,
             "accepted_billable_after_refund_window"
@@ -1805,7 +1832,7 @@ mod tests {
         assert!(snapshot
             .ml_signal_layer
             .labeled_training_data
-            .contains("labeled by Kickbacks"));
+            .contains("labeled by Kickback.ai"));
         assert!(snapshot
             .safety_policy
             .event_states
@@ -1829,6 +1856,10 @@ mod tests {
 
     #[test]
     fn local_probe_surfaces_do_not_call_payable_or_stripe_money_routes() {
+        fn production_source(source: &str) -> &str {
+            source.split("#[cfg(test)]").next().unwrap_or(source)
+        }
+
         let surfaces = [
             ("dashboard and local API", include_str!("app.rs")),
             (
@@ -1863,6 +1894,7 @@ mod tests {
             "stripe::Client",
         ];
         for (surface, source) in surfaces {
+            let source = production_source(source);
             for pattern in forbidden {
                 assert!(
                     !source.contains(pattern),
@@ -1873,15 +1905,38 @@ mod tests {
     }
 
     #[test]
-    fn only_backend_acceptance_can_make_events_payable() {
+    fn backend_acceptance_is_billable_but_not_payout_finality() {
         let archive = Archive::open_in_memory().unwrap();
         let snapshot = current(&archive).unwrap();
-        for boundary in &snapshot.trust_boundaries {
-            if boundary.can_make_payable {
-                assert_eq!(boundary.stage, "backend_acceptance");
-            } else {
-                assert_ne!(boundary.stage, "backend_acceptance");
-            }
+        let backend = snapshot
+            .trust_boundaries
+            .iter()
+            .find(|boundary| boundary.stage == "backend_acceptance")
+            .expect("missing backend acceptance boundary");
+        assert!(backend.can_create_billable_event);
+        assert!(!backend.can_make_payable);
+
+        let payout = snapshot
+            .trust_boundaries
+            .iter()
+            .find(|boundary| boundary.stage == "stripe_payout_finality")
+            .expect("missing Stripe payout finality boundary");
+        assert!(!payout.can_create_billable_event);
+        assert!(payout.can_make_payable);
+
+        for boundary in snapshot
+            .trust_boundaries
+            .iter()
+            .filter(|boundary| boundary.stage != "backend_acceptance")
+        {
+            assert!(!boundary.can_create_billable_event);
+        }
+        for boundary in snapshot
+            .trust_boundaries
+            .iter()
+            .filter(|boundary| boundary.stage != "stripe_payout_finality")
+        {
+            assert!(!boundary.can_make_payable);
         }
         assert!(snapshot
             .settlement_gates
@@ -1917,13 +1972,102 @@ mod tests {
                     "unexpected billable transition target: {:?}",
                     rule
                 );
-                assert!(!rule.can_be_initiated_by_desktop);
+                assert!(!rule.can_be_initiated_by_local_surface);
             }
         }
         assert!(snapshot
             .threat_model
             .iter()
             .any(|threat| threat.threat == "ad_fraud_cost_inflation"));
+    }
+
+    #[test]
+    fn official_adapter_candidates_can_enter_backend_acceptance_gates() {
+        let archive = Archive::open_in_memory().unwrap();
+        let snapshot = current(&archive).unwrap();
+        let candidate = snapshot
+            .finality_model
+            .billing_state_machine
+            .iter()
+            .find(|state| state.state == "candidate_adapter_attested")
+            .expect("missing candidate adapter state");
+        assert!(!candidate.can_bill_advertiser);
+        assert!(!candidate.can_pay_developer);
+        assert!(candidate.next_allowed.contains(&"backend_accepted"));
+        assert!(candidate.next_allowed.contains(&"held_for_review"));
+
+        let local_candidate_rule = snapshot
+            .finality_model
+            .transition_rules
+            .iter()
+            .find(|rule| {
+                rule.from == TrustEventState::CandidateAdapterAttested
+                    && rule.to == TrustEventState::CandidateAdapterAttested
+            })
+            .expect("missing local candidate attestation rule");
+        assert!(local_candidate_rule.can_be_initiated_by_local_surface);
+        assert!(!local_candidate_rule.creates_billable_event);
+        assert!(!local_candidate_rule.creates_payable_event);
+
+        let backend_acceptance = snapshot
+            .finality_model
+            .transition_rules
+            .iter()
+            .find(|rule| {
+                rule.from == TrustEventState::CandidateAdapterAttested
+                    && rule.to == TrustEventState::BackendAccepted
+            })
+            .expect("missing backend acceptance gate");
+        assert!(!backend_acceptance.can_be_initiated_by_local_surface);
+        assert!(backend_acceptance.creates_billable_event);
+        assert!(!backend_acceptance.creates_payable_event);
+    }
+
+    #[test]
+    fn only_refund_window_finality_can_release_payout() {
+        let archive = Archive::open_in_memory().unwrap();
+        let snapshot = current(&archive).unwrap();
+        for state in &snapshot.finality_model.billing_state_machine {
+            if state.can_pay_developer {
+                assert!(
+                    matches!(
+                        state.state,
+                        "accepted_billable_after_refund_window" | "paid"
+                    ),
+                    "unexpected payable state: {:?}",
+                    state
+                );
+            }
+            if state.state == "backend_accepted" {
+                assert!(!state.can_pay_developer);
+            }
+        }
+
+        for rule in &snapshot.finality_model.transition_rules {
+            if rule.to == TrustEventState::Paid {
+                assert_eq!(
+                    rule.from,
+                    TrustEventState::AcceptedBillableAfterRefundWindow
+                );
+                assert!(!rule.can_be_initiated_by_local_surface);
+            }
+            if rule.creates_payable_event {
+                assert!(
+                    matches!(
+                        (rule.from, rule.to),
+                        (
+                            TrustEventState::BackendAccepted,
+                            TrustEventState::AcceptedBillableAfterRefundWindow
+                        ) | (
+                            TrustEventState::AcceptedBillableAfterRefundWindow,
+                            TrustEventState::Paid
+                        )
+                    ),
+                    "unexpected payout transition: {:?}",
+                    rule
+                );
+            }
+        }
     }
 
     #[test]
@@ -2013,7 +2157,7 @@ mod tests {
         let archive = Archive::open_in_memory().unwrap();
         let snapshot = current(&archive).unwrap();
         for rule in &snapshot.finality_model.transition_rules {
-            if rule.can_be_initiated_by_desktop
+            if rule.can_be_initiated_by_local_surface
                 || matches!(
                     rule.from,
                     TrustEventState::ProbeNonEarning | TrustEventState::ObservedLocal
@@ -2042,8 +2186,8 @@ mod tests {
             assert!(!bucket.can_bill_advertiser);
             assert!(!bucket.can_pay_developer);
             assert!(
-                bucket.local_desktop_authority.contains("cannot")
-                    || bucket.local_desktop_authority.contains("never")
+                bucket.local_surface_authority.contains("cannot")
+                    || bucket.local_surface_authority.contains("never")
             );
         }
     }

@@ -1,10 +1,12 @@
-//! kickbacks-kit (`kb`): read-only companion tools for the kickbacks.ai
-//! extension. Archive every ad you are shown and watch your stats in a TUI.
+//! kickbacks-kit (`kb`): local command-center tools for Kickback.ai surfaces.
+//! Archive local extension observations, inspect trust state, and manage
+//! marker-owned integrations from the CLI, TUI, and desktop app.
 //!
-//! Design principle: this crate only ever OBSERVES local artifacts the
-//! extension already writes. It never posts an impression, click, or any other
-//! billing event, and never talks to the kickbacks.ai backend. It records the
-//! history the extension throws away — nothing more.
+//! Design principle: shipped local controls observe, diagnose, and explain.
+//! Every agent interaction with developer attention is potential inventory only
+//! when it runs through an official opt-in adapter with visibility proof and
+//! backend settlement gates. Local archive, doctor, repair, install, and skill
+//! surfaces never self-settle billing or payouts.
 
 mod app;
 mod archive;
@@ -45,10 +47,12 @@ use archive::Archive;
 #[derive(Parser)]
 #[command(
     version,
-    about = "Read-only companion tools for the kickbacks.ai extension",
-    long_about = "kickbacks-kit observes the ads the kickbacks.ai extension shows you and \
-                  keeps the history it discards: a searchable ad archive and a live TUI \
-                  dashboard. It is strictly read-only and never reports a billing event."
+    about = "Phase 0 command-center tools for Kickback.ai surfaces",
+    long_about = "kickbacks-kit archives local Kickback.ai observations, exposes a Trust Engine, \
+                  and manages marker-owned CLI/TUI/desktop integration surfaces. Local controls \
+                  never self-settle billing or payouts; official opt-in adapters may create \
+                  candidate attention events only with consent, visibility proof, and backend \
+                  settlement gates."
 )]
 struct Cli {
     #[command(subcommand)]
@@ -129,6 +133,9 @@ enum Command {
         /// Do not open the dashboard in the default browser
         #[arg(long)]
         no_open: bool,
+        /// Allow binding the local dashboard to a non-loopback host
+        #[arg(long, hide = true)]
+        unsafe_public_bind: bool,
     },
     /// Print one local app API payload as JSON
     Api {
@@ -157,17 +164,17 @@ enum Command {
     Repair(InstallArgs),
     /// Restore guidance for marker-owned integrations
     Restore,
-    /// Launch Claude Code through the Kickbacks wrapper
+    /// Launch Claude Code through the Kickback.ai wrapper
     Claude {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
-    /// Launch Codex through the Kickbacks wrapper
+    /// Launch Codex through the Kickback.ai wrapper
     Codex {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
-    /// Launch Hermes TUI through the Kickbacks wrapper
+    /// Launch Hermes TUI through the Kickback.ai wrapper
     Hermes {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
@@ -225,7 +232,7 @@ struct InstallArgs {
 enum AuthCommand {
     /// Show local auth presence without printing secrets
     Status,
-    /// Open Kickbacks sign-in in the browser
+    /// Open Kickback.ai sign-in in the browser
     SignIn,
     /// Explain how to sign out safely
     SignOut,
@@ -298,7 +305,8 @@ fn main() -> Result<()> {
             host,
             port,
             no_open,
-        } => app::run(host, port, !no_open),
+            unsafe_public_bind,
+        } => app::run_with_bind_policy(host, port, !no_open, unsafe_public_bind),
         Command::Api { endpoint } => app::print_api(&endpoint),
         Command::Auth { command } => run_auth(command),
         Command::Sync { command } => run_sync(command),
@@ -341,7 +349,7 @@ fn run_auth(command: AuthCommand) -> Result<()> {
             Ok(())
         }
         AuthCommand::SignOut => {
-            println!("Use the official Kickbacks extension sign-out command or revoke the session at Kickbacks.ai.");
+            println!("Use the official Kickback.ai extension sign-out command or revoke the session at Kickback.ai.");
             println!(
                 "This tool will not delete credential files unless you explicitly remove them."
             );
