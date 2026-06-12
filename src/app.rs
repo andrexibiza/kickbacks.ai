@@ -948,16 +948,15 @@ mod tests {
     #[test]
     fn http_routes_unknown_api_to_404_and_non_get_to_405() {
         with_isolated_app_env(|| {
-            let known = request("GET", "/api/install/enable");
+            let known = request("GET", "/");
             assert!(
                 known.starts_with("HTTP/1.1 200 OK"),
-                "known API route returned {known}"
+                "root route returned {known}"
             );
             assert!(
-                known.contains("Content-Type: application/json; charset=utf-8"),
-                "known API route did not return JSON headers: {known}"
+                known.contains("Content-Type: text/html; charset=utf-8"),
+                "root route did not return HTML headers: {known}"
             );
-            serde_json::from_str::<serde_json::Value>(body(&known)).unwrap();
 
             let unknown = request("GET", "/api/not-real");
             assert!(unknown.starts_with("HTTP/1.1 404 Not Found"));
