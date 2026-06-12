@@ -218,21 +218,22 @@ fn executable_extensions() -> Vec<String> {
 fn vscode_status() -> IntegrationStatus {
     let code = find_executable("code");
     let extension = installed_extension_dir();
+    let has_extension = extension.is_some();
     let version = extension.as_ref().and_then(|p| extension_version(p));
     IntegrationStatus {
         id: "vscode",
         label: "VS Code extension",
         kind: "desktop_editor",
-        detected: code.is_some() || extension.is_some(),
-        enabled: extension.is_some(),
-        capability: if extension.is_some() {
+        detected: code.is_some() || has_extension,
+        enabled: has_extension,
+        capability: if has_extension {
             IntegrationCapability::Earn
         } else {
             IntegrationCapability::Configure
         },
         version,
         path: extension.or(code).map(|p| p.display().to_string()),
-        detail: if installed_extension_dir().is_some() {
+        detail: if has_extension {
             "Kickbacks extension detected".to_string()
         } else {
             "Install the Kickbacks extension to enable VS Code earning surfaces".to_string()
@@ -534,12 +535,16 @@ fn installed_extension_dir_from(exts_dir: &Path) -> Option<PathBuf> {
         .filter_map(|e| e.ok())
         .map(|e| e.path())
         .filter(|p| extension_version(p).is_some())
-        .max_by(|a, b| {
-            compare_versions(
-                &extension_version(a).unwrap(),
-                &extension_version(b).unwrap(),
-            )
-        })
+        .max_by(|a, b| compare_extension_paths(a, b))
+}
+
+fn compare_extension_paths(a: &Path, b: &Path) -> Ordering {
+    match (extension_version(a), extension_version(b)) {
+        (Some(left), Some(right)) => compare_versions(&left, &right),
+        (Some(_), None) => Ordering::Greater,
+        (None, Some(_)) => Ordering::Less,
+        (None, None) => Ordering::Equal,
+    }
 }
 
 fn extension_version(path: &Path) -> Option<String> {

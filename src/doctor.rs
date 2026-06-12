@@ -5,7 +5,7 @@ use anyhow::Result;
 use crossterm::style::Stylize;
 
 use crate::archive::Archive;
-use crate::{paths, sources, sync_health, trust_engine, util};
+use crate::{integrations, paths, sources, sync_health, trust_engine, util};
 
 /// How fresh `cli-ad.json` must be to count as a live ad (matches the
 /// extension's own 10-minute freshness window).
@@ -102,15 +102,36 @@ pub fn run() -> Result<()> {
         ),
     );
 
-    let installed = extension_installed();
+    let system = integrations::system_status()?;
+    for integration in &system.integrations {
+        check(
+            integration.label,
+            integration.enabled,
+            &format!(
+                "{}; repair with `{}`",
+                integration.detail, integration.repair_command
+            ),
+        );
+    }
+
+    for skill in &system.skills {
+        check(
+            skill.label,
+            skill.owned,
+            &format!("{}; repair with `{}`", skill.detail, skill.repair_command),
+        );
+    }
+
     check(
-        "kickbacks.ai extension",
-        installed,
-        if installed {
-            "found in ~/.vscode/extensions"
-        } else {
-            "not found — install from the VS Code Marketplace"
-        },
+        "Stripe Connect boundary",
+        system.stripe.backend_owned && system.stripe.payouts_ready.is_none(),
+        system.stripe.note,
+    );
+
+    check(
+        "non-earning probe mode",
+        true,
+        "doctor/install/repair/skills inspect local state and do not create payable events",
     );
 
     println!();
@@ -128,20 +149,4 @@ fn check(label: &str, ok: bool, detail: &str) {
         "•".yellow().to_string()
     };
     println!("  {mark} {:<26} {}", label, detail.dim());
-}
-
-/// Best-effort detection of the installed VS Code extension.
-fn extension_installed() -> bool {
-    let Some(home) = dirs::home_dir() else {
-        return false;
-    };
-    let exts = home.join(".vscode").join("extensions");
-    let Ok(entries) = std::fs::read_dir(exts) else {
-        return false;
-    };
-    entries.filter_map(Result::ok).any(|e| {
-        e.file_name()
-            .to_string_lossy()
-            .starts_with("kickbacksai.kickbacks-ai")
-    })
 }

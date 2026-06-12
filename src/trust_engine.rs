@@ -13,19 +13,55 @@ use serde::Serialize;
 use crate::archive::{Archive, LedgerEvent, Stats};
 use crate::{integrations, sync_health, util};
 
-const EVENT_STATES: &[&str] = &[
-    "probe_non_earning",
-    "observed_local",
-    "candidate_adapter_attested",
-    "held_for_review",
-    "eligible_but_capped",
-    "backend_accepted",
-    "accepted_billable_after_refund_window",
-    "paid",
-    "refunded",
-    "rejected",
-    "fraudulent",
+const EVENT_STATES: &[TrustEventState] = &[
+    TrustEventState::ProbeNonEarning,
+    TrustEventState::ObservedLocal,
+    TrustEventState::CandidateAdapterAttested,
+    TrustEventState::HeldForReview,
+    TrustEventState::EligibleButCapped,
+    TrustEventState::BackendAccepted,
+    TrustEventState::AcceptedBillableAfterRefundWindow,
+    TrustEventState::Paid,
+    TrustEventState::Refunded,
+    TrustEventState::Rejected,
+    TrustEventState::Fraudulent,
 ];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TrustEventState {
+    ProbeNonEarning,
+    ObservedLocal,
+    CandidateAdapterAttested,
+    HeldForReview,
+    EligibleButCapped,
+    BackendAccepted,
+    AcceptedBillableAfterRefundWindow,
+    Paid,
+    Refunded,
+    Rejected,
+    Fraudulent,
+}
+
+impl TrustEventState {
+    fn as_str(self) -> &'static str {
+        match self {
+            TrustEventState::ProbeNonEarning => "probe_non_earning",
+            TrustEventState::ObservedLocal => "observed_local",
+            TrustEventState::CandidateAdapterAttested => "candidate_adapter_attested",
+            TrustEventState::HeldForReview => "held_for_review",
+            TrustEventState::EligibleButCapped => "eligible_but_capped",
+            TrustEventState::BackendAccepted => "backend_accepted",
+            TrustEventState::AcceptedBillableAfterRefundWindow => {
+                "accepted_billable_after_refund_window"
+            }
+            TrustEventState::Paid => "paid",
+            TrustEventState::Refunded => "refunded",
+            TrustEventState::Rejected => "rejected",
+            TrustEventState::Fraudulent => "fraudulent",
+        }
+    }
+}
 
 #[derive(Debug, Clone, Serialize)]
 pub struct TrustEngineSnapshot {
@@ -98,6 +134,7 @@ pub struct FinalityModel {
     pub invariant: &'static str,
     pub payable_state: &'static str,
     pub billing_state_machine: Vec<BillingState>,
+    pub transition_rules: Vec<TrustTransitionRule>,
     pub hard_stop_rules: Vec<HardStopRule>,
     pub finality_rules: Vec<&'static str>,
 }
@@ -110,6 +147,17 @@ pub struct BillingState {
     pub can_bill_advertiser: bool,
     pub can_pay_developer: bool,
     pub next_allowed: Vec<&'static str>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct TrustTransitionRule {
+    pub from: TrustEventState,
+    pub to: TrustEventState,
+    pub owner: &'static str,
+    pub required_evidence: &'static str,
+    pub can_be_initiated_by_desktop: bool,
+    pub creates_billable_event: bool,
+    pub creates_payable_event: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -225,8 +273,11 @@ pub struct SurfaceAttestation {
     pub threshold_reached: Option<bool>,
     pub under_caps: Option<bool>,
     pub official_adapter: bool,
+    pub backend_attestation_verified: bool,
     pub can_earn: bool,
     pub can_observe: bool,
+    pub can_create_billable_events: bool,
+    pub can_create_payable_events: bool,
     pub probe_mode_available: bool,
     pub state: String,
 }
@@ -424,7 +475,7 @@ pub fn current(archive: &Archive) -> Result<TrustEngineSnapshot> {
 }
 
 fn event_state_names() -> Vec<&'static str> {
-    EVENT_STATES.to_vec()
+    EVENT_STATES.iter().map(|state| state.as_str()).collect()
 }
 
 fn held_for_sync_review_count(sync: &sync_health::SyncHealth) -> usize {
@@ -839,6 +890,7 @@ fn finality_model() -> FinalityModel {
                 next_allowed: vec!["fraudulent"],
             },
         ],
+        transition_rules: trust_transition_rules(),
         hard_stop_rules: vec![
             HardStopRule {
                 rule: "sync_lag_after_account_watermark",
@@ -881,13 +933,163 @@ fn finality_model() -> FinalityModel {
     }
 }
 
+fn trust_transition_rules() -> Vec<TrustTransitionRule> {
+    vec![
+        TrustTransitionRule {
+            from: TrustEventState::ProbeNonEarning,
+            to: TrustEventState::ProbeNonEarning,
+            owner: "installer / repair / doctor / dashboard / skill",
+            required_evidence: "probe origin marker",
+            can_be_initiated_by_desktop: true,
+            creates_billable_event: false,
+            creates_payable_event: false,
+        },
+        TrustTransitionRule {
+            from: TrustEventState::ObservedLocal,
+            to: TrustEventState::ObservedLocal,
+            owner: "desktop archive",
+            required_evidence: "local sighting row only",
+            can_be_initiated_by_desktop: true,
+            creates_billable_event: false,
+            creates_payable_event: false,
+        },
+        TrustTransitionRule {
+            from: TrustEventState::CandidateAdapterAttested,
+            to: TrustEventState::HeldForReview,
+            owner: "backend trust service",
+            required_evidence: "adapter receipt plus unresolved sync, cap, cluster, or refund-window evidence",
+            can_be_initiated_by_desktop: false,
+            creates_billable_event: false,
+            creates_payable_event: false,
+        },
+        TrustTransitionRule {
+            from: TrustEventState::CandidateAdapterAttested,
+            to: TrustEventState::EligibleButCapped,
+            owner: "backend cap and velocity engine",
+            required_evidence: "valid attention beyond a campaign, account, surface, or trust-tier cap",
+            can_be_initiated_by_desktop: false,
+            creates_billable_event: false,
+            creates_payable_event: false,
+        },
+        TrustTransitionRule {
+            from: TrustEventState::CandidateAdapterAttested,
+            to: TrustEventState::BackendAccepted,
+            owner: "backend trust service",
+            required_evidence:
+                "signed adapter receipt, duplicate rejection, caps, cluster checks, and campaign exposure limits",
+            can_be_initiated_by_desktop: false,
+            creates_billable_event: true,
+            creates_payable_event: false,
+        },
+        TrustTransitionRule {
+            from: TrustEventState::CandidateAdapterAttested,
+            to: TrustEventState::Rejected,
+            owner: "backend trust service",
+            required_evidence: "policy violation, missing proof, duplicate, replay, or failed validation",
+            can_be_initiated_by_desktop: false,
+            creates_billable_event: false,
+            creates_payable_event: false,
+        },
+        TrustTransitionRule {
+            from: TrustEventState::CandidateAdapterAttested,
+            to: TrustEventState::Fraudulent,
+            owner: "backend trust service",
+            required_evidence: "confirmed bot, farm, replay, click-farm, or invalid-traffic evidence",
+            can_be_initiated_by_desktop: false,
+            creates_billable_event: false,
+            creates_payable_event: false,
+        },
+        TrustTransitionRule {
+            from: TrustEventState::HeldForReview,
+            to: TrustEventState::BackendAccepted,
+            owner: "backend trust service or manual review",
+            required_evidence: "auditable hold release with preserved reason history",
+            can_be_initiated_by_desktop: false,
+            creates_billable_event: true,
+            creates_payable_event: false,
+        },
+        TrustTransitionRule {
+            from: TrustEventState::HeldForReview,
+            to: TrustEventState::Rejected,
+            owner: "backend trust service or manual review",
+            required_evidence: "auditable rejection reason",
+            can_be_initiated_by_desktop: false,
+            creates_billable_event: false,
+            creates_payable_event: false,
+        },
+        TrustTransitionRule {
+            from: TrustEventState::HeldForReview,
+            to: TrustEventState::Fraudulent,
+            owner: "backend trust service or manual review",
+            required_evidence: "auditable fraud or invalid-traffic reason",
+            can_be_initiated_by_desktop: false,
+            creates_billable_event: false,
+            creates_payable_event: false,
+        },
+        TrustTransitionRule {
+            from: TrustEventState::BackendAccepted,
+            to: TrustEventState::AcceptedBillableAfterRefundWindow,
+            owner: "billing and payout ledger",
+            required_evidence: "refund window, payout holds, KYC/1099, and Connect requirements cleared",
+            can_be_initiated_by_desktop: false,
+            creates_billable_event: false,
+            creates_payable_event: true,
+        },
+        TrustTransitionRule {
+            from: TrustEventState::BackendAccepted,
+            to: TrustEventState::Refunded,
+            owner: "billing and refund ledger",
+            required_evidence: "invalid, reversed, disputed, or adjusted billed traffic",
+            can_be_initiated_by_desktop: false,
+            creates_billable_event: false,
+            creates_payable_event: false,
+        },
+        TrustTransitionRule {
+            from: TrustEventState::BackendAccepted,
+            to: TrustEventState::Rejected,
+            owner: "backend trust service or manual review",
+            required_evidence: "late validation failure before payout finality",
+            can_be_initiated_by_desktop: false,
+            creates_billable_event: false,
+            creates_payable_event: false,
+        },
+        TrustTransitionRule {
+            from: TrustEventState::BackendAccepted,
+            to: TrustEventState::Fraudulent,
+            owner: "backend trust service or manual review",
+            required_evidence: "late fraud or invalid-traffic decision before payout finality",
+            can_be_initiated_by_desktop: false,
+            creates_billable_event: false,
+            creates_payable_event: false,
+        },
+        TrustTransitionRule {
+            from: TrustEventState::AcceptedBillableAfterRefundWindow,
+            to: TrustEventState::Paid,
+            owner: "Stripe Connect payout flow",
+            required_evidence: "backend payout release instruction after all holds clear",
+            can_be_initiated_by_desktop: false,
+            creates_billable_event: false,
+            creates_payable_event: true,
+        },
+        TrustTransitionRule {
+            from: TrustEventState::AcceptedBillableAfterRefundWindow,
+            to: TrustEventState::Refunded,
+            owner: "billing and refund ledger",
+            required_evidence: "post-acceptance adjustment with advertiser credit and payout clawback policy",
+            can_be_initiated_by_desktop: false,
+            creates_billable_event: false,
+            creates_payable_event: false,
+        },
+    ]
+}
+
 fn advertiser_assurance_report() -> AdvertiserAssuranceReport {
     AdvertiserAssuranceReport {
         title: "Advertiser Trust Assurance Report",
         proof_standard:
             "Show filtered, rejected, held, refunded, and final billable reach separately; never collapse them into one opaque impression count.",
         public_claim:
-            "Kickbacks filters invalid traffic before payout finality and gives advertisers an auditable reason ledger for every non-billable or refunded event.",
+            "Kickbacks should filter invalid traffic before payout finality and give advertisers an auditable reason ledger for every non-billable or refunded event.",
         required_tables: vec![
             AssuranceTable {
                 table: "event_classification_ledger",
@@ -1099,7 +1301,7 @@ fn ml_signal_layer() -> MlSignalLayer {
         authority_boundary:
             "ML outputs are data points and reason-code candidates. Deterministic policy, manual review, and the backend event state machine decide settlement.",
         labeled_training_data:
-            "Known bot accounts and bot events already labeled by Kickbacks should bootstrap supervised training, validation, and precision/recall reporting.",
+            "Known bot accounts and bot events labeled by Kickbacks, when available, should bootstrap supervised training, validation, and precision/recall reporting.",
         feature_row: vec![
             "account_age",
             "kyc_status",
@@ -1372,8 +1574,11 @@ fn surface_attestations(
                 threshold_reached,
                 under_caps: None,
                 official_adapter,
+                backend_attestation_verified: false,
                 can_earn,
                 can_observe,
+                can_create_billable_events: false,
+                can_create_payable_events: false,
                 probe_mode_available: true,
                 state: if official_adapter {
                     "official adapter candidate detected; backend signature/cap/cluster checks still required"
@@ -1555,6 +1760,7 @@ fn recent_event_proofs(events: Vec<LedgerEvent>) -> Vec<EventProof> {
 mod tests {
     use super::*;
     use crate::model::CliAd;
+    use std::collections::HashSet;
 
     fn ad(text: &str, url: &str, ts: i64) -> CliAd {
         CliAd {
@@ -1575,6 +1781,11 @@ mod tests {
         let snapshot = current(&archive).unwrap();
         assert!(snapshot.pitch.contains("backend ledgers decide settlement"));
         assert!(snapshot.non_earning_probe_mode.enabled);
+        assert!(!snapshot.non_earning_probe_mode.can_create_payable_events);
+        assert_eq!(
+            snapshot.non_earning_probe_mode.event_state,
+            "probe_non_earning"
+        );
         assert!(snapshot
             .trust_boundaries
             .iter()
@@ -1599,23 +1810,65 @@ mod tests {
             .safety_policy
             .event_states
             .contains(&"held_for_review"));
+        assert!(snapshot
+            .safety_policy
+            .event_states
+            .contains(&"probe_non_earning"));
+        assert!(snapshot
+            .safety_policy
+            .event_states
+            .contains(&"backend_accepted"));
         assert_eq!(
             snapshot.recent_event_proofs[0].classification,
             "visible_but_non_billable"
         );
+        assert_eq!(snapshot.recent_event_proofs[0].state, "observed_local");
+        assert!(!snapshot.recent_event_proofs[0].billable);
+        assert!(!snapshot.recent_event_proofs[0].payable);
     }
 
     #[test]
-    fn safety_surfaces_do_not_call_metrics_routes() {
-        let dashboard = include_str!("app.rs");
-        let installer = include_str!("install_system.rs");
-        let note = include_str!("developer_note.rs");
-        for source in [dashboard, installer, note] {
-            assert!(!source.contains("/v1/metrics"));
-            assert!(!source.contains("/v1/events"));
-            assert!(!source.contains("metrics.kickbacks"));
-            assert!(!source.contains("fetch(\"/v1"));
-            assert!(!source.contains("fetch('/v1"));
+    fn local_probe_surfaces_do_not_call_payable_or_stripe_money_routes() {
+        let surfaces = [
+            ("dashboard and local API", include_str!("app.rs")),
+            (
+                "installer repair skills and Hermes plugin",
+                include_str!("install_system.rs"),
+            ),
+            ("developer note", include_str!("developer_note.rs")),
+            ("integration status", include_str!("integrations.rs")),
+            ("local doctor", include_str!("doctor.rs")),
+            ("sync monitor", include_str!("sync_health.rs")),
+        ];
+        let forbidden = [
+            "/v1/metrics",
+            "/v1/events",
+            "metrics.kickbacks",
+            "events.kickbacks",
+            "billing.kickbacks",
+            "fetch(\"/v1",
+            "fetch('/v1",
+            "api.stripe.com",
+            "/v1/charges",
+            "/v1/payment_intents",
+            "/v1/checkout/sessions",
+            "/v1/payouts",
+            "/v1/transfers",
+            "/v1/topups",
+            "/v1/refunds",
+            "Charge::create",
+            "PaymentIntent::create",
+            "Payout::create",
+            "Transfer::create",
+            "stripe::Client",
+        ];
+        for (surface, source) in surfaces {
+            for pattern in forbidden {
+                assert!(
+                    !source.contains(pattern),
+                    "{surface} contains forbidden payable or money-movement token {pattern}"
+                );
+            }
         }
     }
 
@@ -1645,6 +1898,26 @@ mod tests {
                     .next_allowed
                     .iter()
                     .any(|next| next.contains("accepted")));
+            }
+        }
+        for rule in &snapshot.finality_model.transition_rules {
+            if rule.creates_payable_event {
+                assert!(
+                    matches!(
+                        rule.to,
+                        TrustEventState::AcceptedBillableAfterRefundWindow | TrustEventState::Paid
+                    ),
+                    "unexpected payable transition target: {:?}",
+                    rule
+                );
+            }
+            if rule.creates_billable_event {
+                assert!(
+                    matches!(rule.to, TrustEventState::BackendAccepted),
+                    "unexpected billable transition target: {:?}",
+                    rule
+                );
+                assert!(!rule.can_be_initiated_by_desktop);
             }
         }
         assert!(snapshot
@@ -1680,5 +1953,112 @@ mod tests {
             .control_evidence
             .iter()
             .any(|c| c.control == "refund_buffer_before_payout" && c.advertiser_visible));
+        assert!(snapshot.advertiser_protection.billing_counts_backend_owned);
+        assert!(
+            snapshot
+                .advertiser_protection
+                .local_counts_are_not_invoiceable
+        );
+    }
+
+    #[test]
+    fn transition_targets_are_declared_and_terminal_states_do_not_escape() {
+        let archive = Archive::open_in_memory().unwrap();
+        let snapshot = current(&archive).unwrap();
+        let declared: HashSet<&str> = snapshot
+            .safety_policy
+            .event_states
+            .iter()
+            .copied()
+            .collect();
+        for state in &snapshot.finality_model.billing_state_machine {
+            assert!(
+                declared.contains(state.state),
+                "undeclared state {}",
+                state.state
+            );
+            for next in &state.next_allowed {
+                assert!(
+                    declared.contains(next),
+                    "undeclared transition target {next}"
+                );
+            }
+        }
+
+        for terminal in [
+            "probe_non_earning",
+            "observed_local",
+            "eligible_but_capped",
+            "paid",
+            "refunded",
+            "rejected",
+            "fraudulent",
+        ] {
+            let state = snapshot
+                .finality_model
+                .billing_state_machine
+                .iter()
+                .find(|s| s.state == terminal)
+                .unwrap_or_else(|| panic!("missing terminal state {terminal}"));
+            assert_eq!(
+                state.next_allowed,
+                vec![terminal],
+                "{terminal} must not transition into another settlement state"
+            );
+        }
+    }
+
+    #[test]
+    fn local_and_probe_transitions_cannot_become_paid() {
+        let archive = Archive::open_in_memory().unwrap();
+        let snapshot = current(&archive).unwrap();
+        for rule in &snapshot.finality_model.transition_rules {
+            if rule.can_be_initiated_by_desktop
+                || matches!(
+                    rule.from,
+                    TrustEventState::ProbeNonEarning | TrustEventState::ObservedLocal
+                )
+            {
+                assert!(!rule.creates_billable_event, "{rule:?}");
+                assert!(!rule.creates_payable_event, "{rule:?}");
+                assert!(
+                    !matches!(
+                        rule.to,
+                        TrustEventState::BackendAccepted
+                            | TrustEventState::AcceptedBillableAfterRefundWindow
+                            | TrustEventState::Paid
+                    ),
+                    "{rule:?}"
+                );
+            }
+        }
+
+        let buckets = snapshot.event_state_buckets;
+        for state in ["probe_non_earning", "observed_local"] {
+            let bucket = buckets
+                .iter()
+                .find(|b| b.state == state)
+                .unwrap_or_else(|| panic!("missing bucket {state}"));
+            assert!(!bucket.can_bill_advertiser);
+            assert!(!bucket.can_pay_developer);
+            assert!(
+                bucket.local_desktop_authority.contains("cannot")
+                    || bucket.local_desktop_authority.contains("never")
+            );
+        }
+    }
+
+    #[test]
+    fn surface_attestations_never_claim_backend_certainty() {
+        let archive = Archive::open_in_memory().unwrap();
+        let snapshot = current(&archive).unwrap();
+        for surface in snapshot.surface_attestations {
+            assert!(!surface.backend_attestation_verified);
+            assert!(!surface.can_create_billable_events);
+            assert!(!surface.can_create_payable_events);
+            if surface.official_adapter {
+                assert!(surface.state.contains("candidate"));
+            }
+        }
     }
 }

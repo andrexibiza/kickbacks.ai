@@ -708,9 +708,9 @@ function renderNote(n) {
   document.getElementById('note-trust').textContent = n.trust_pitch;
   document.getElementById('note-availability').textContent = n.availability;
   document.getElementById('note-outreach').textContent = n.outreach_reply;
-  document.getElementById('note-principles').innerHTML = n.principles.map(p => `<li>${p}</li>`).join('');
-  document.getElementById('note-architecture').innerHTML = n.technical_architecture.map(p => `<li>${p}</li>`).join('');
-  document.getElementById('note-ml').innerHTML = n.ml_plan.map(p => `<li>${p}</li>`).join('');
+  document.getElementById('note-principles').innerHTML = n.principles.map(p => `<li>${escapeHtml(p)}</li>`).join('');
+  document.getElementById('note-architecture').innerHTML = n.technical_architecture.map(p => `<li>${escapeHtml(p)}</li>`).join('');
+  document.getElementById('note-ml').innerHTML = n.ml_plan.map(p => `<li>${escapeHtml(p)}</li>`).join('');
   document.getElementById('note-payout-review').textContent = n.payout_review_note;
 }
 
