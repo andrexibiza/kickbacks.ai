@@ -260,15 +260,17 @@
     // and since we only READ its rect (never mutate it) a mis-match is at
     // worst a cosmetic mispaint, never a prime-directive violation.
     //
-    // ALSO require `loading-shimmer` (the live sweep marker) and a non-zero
-    // bounding rect. Codex 26.x keeps the post-turn "Thinking 1.2s" summary
-    // chip in the chat history with the SAME `text-size-chat truncate
-    // select-none` class combo and textContent "Thinking 1.2s", but as a
-    // display:none / hidden element — it does NOT carry `loading-shimmer-*`.
-    // Without the extra anchors the old predicate matched the static history
-    // chip and `isThinkingRow()` returned true forever — overlay never
-    // released at idle (row 03 regression) and stuck to turn 1 on multi-
-    // turn prompts (row 08, "glued to turn 1").
+    // Prefer `loading-shimmer` (the live sweep marker), but do not require it
+    // as the only liveness proof. Codex can pass `active` through the wrapper,
+    // rendering the same visible Thinking row as a plain span with the stable
+    // class trio but WITHOUT the loading-shimmer marker. That was the real
+    // no-spinner failure: auth/ad/patch healthy, DOM paint never found a row.
+    //
+    // Still reject stale post-turn chips by requiring a non-zero rect,
+    // visible style, and visible text that starts with Thinking when the live
+    // shimmer marker is absent. Codex 26.x keeps post-turn "Thinking 1.2s"
+    // summary chips in chat history with the SAME class trio, but as
+    // display:none / hidden / zero-rect elements.
     function findRow() {
       var els = document.querySelectorAll(
         '[class*="text-size-chat"][class*="truncate"]');
@@ -277,7 +279,13 @@
         if (el.nodeType !== 1) continue;
         var c = " " + (el.className || "") + " ";
         if (c.indexOf("select-none") === -1) continue;
-        if (c.indexOf("loading-shimmer") === -1) continue;
+        var hasLiveShimmerClass = c.indexOf("loading-shimmer") !== -1;
+        if (!hasLiveShimmerClass) {
+          // Active/plain Thinking rows are live even without the shimmer class;
+          // stale/history chips are rejected below by rect + visibility.
+          var txt = (el.textContent || "").trim().toLowerCase();
+          if (txt.indexOf("thinking") !== 0) continue;
+        }
         var r = el.getBoundingClientRect && el.getBoundingClientRect();
         if (!r || (!r.width && !r.height)) continue;
         // Honour visibility / opacity. Codex 26.x keeps the live shimmer

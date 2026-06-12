@@ -10,8 +10,9 @@ import { JSDOM } from "jsdom";
 // isThinkingRow() agreed → overlay never released at idle (row 03) and stuck
 // to turn 1 on multi-turn prompts (row 08, "glued to turn 1").
 //
-// Fix is in extension/src/adapters/codex/block.asset.js: findRow() now also
-// requires `loading-shimmer` in the className AND a non-zero bounding rect.
+// Fix is in extension/src/adapters/codex/block.asset.js: findRow() now
+// prefers `loading-shimmer`, falls back to a visible active/plain Thinking row,
+// and always requires a non-zero bounding rect plus visible style.
 
 const ASSET = readFileSync(
   join(__dirname, "..", "src", "adapters", "codex", "block.asset.js"), "utf8");
@@ -90,6 +91,19 @@ function makeLiveShimmer(doc: Document): HTMLElement {
   return el;
 }
 
+// Codex can also pass `active` into the ThinkingShimmer wrapper, which renders
+// the same visible row through the plain span path. That keeps the stable
+// class trio and visible Thinking text, but drops the loading-shimmer marker
+// that the cadenced shimmer path adds. This was the Axl-visible no-spinner
+// failure: auth/ad/patch were healthy, but findRow() failed closed to no paint.
+function makeActivePlainThinkingRow(doc: Document): HTMLElement {
+  const el = doc.createElement("span");
+  el.className = "text-size-chat leading-[1.5] select-none truncate";
+  el.textContent = "Thinking";
+  setRect(el, { x: 40, y: 80, w: 180, h: 20 });
+  return el;
+}
+
 // The post-turn "Thinking 1.2s" summary chip Codex leaves in chat history
 // after streaming ends. Same class trio (text-size-chat / truncate /
 // select-none) BUT no loading-shimmer-* class and (typically) display:none
@@ -111,6 +125,20 @@ describe("S9 codex findRow — live shimmer only, never stale chip", () => {
     const overlay = doc.querySelector('[data-vibe-ads="codex"]');
     expect(overlay).toBeTruthy();
     expect(overlay!.querySelector('[data-vibe-ads-ad]')).toBeTruthy();
+    dom.window.close();
+  });
+
+  it("paints overlay on Codex's visible active plain Thinking row", async () => {
+    const { dom, doc, mc } = makeDom();
+    mc.appendChild(makeActivePlainThinkingRow(doc));
+    bootAsset(dom);
+    await sleep(200);                          // > 80ms interval tick
+    const overlay = doc.querySelector('[data-vibe-ads="codex"]') as
+      HTMLElement | null;
+    expect(overlay).toBeTruthy();
+    expect(overlay!.querySelector('[data-vibe-ads-ad]')).toBeTruthy();
+    expect(overlay!.style.left).toBe("40px");
+    expect(overlay!.style.top).toBe("80px");
     dom.window.close();
   });
 
