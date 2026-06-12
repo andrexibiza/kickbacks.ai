@@ -7,7 +7,7 @@ pub struct DeveloperNote {
     pub tone: &'static str,
     pub summary: &'static str,
     pub availability: &'static str,
-    pub principles: [&'static str; 6],
+    pub principles: [&'static str; 7],
     pub implementation_offer: [&'static str; 6],
     pub technical_architecture: [&'static str; 6],
     pub ml_plan: [&'static str; 6],

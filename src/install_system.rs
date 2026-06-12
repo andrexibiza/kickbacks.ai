@@ -348,12 +348,16 @@ fn remove_empty_dir(path: &Path) -> Result<()> {
     if path.exists() {
         match fs::remove_dir(path) {
             Ok(()) => {}
-            Err(err) if err.kind() == std::io::ErrorKind::DirectoryNotEmpty => {}
+            Err(err) if is_directory_not_empty(&err) => {}
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
             Err(err) => return Err(err).with_context(|| format!("removing {}", path.display())),
         }
     }
     Ok(())
+}
+
+fn is_directory_not_empty(err: &std::io::Error) -> bool {
+    matches!(err.raw_os_error(), Some(145 | 39 | 17))
 }
 
 fn skill_md(surface: &str) -> String {

@@ -751,7 +751,6 @@ setInterval(refresh, 15000);
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::{Read as _, Write as _};
     use std::sync::{Mutex, OnceLock};
 
     fn env_lock() -> &'static Mutex<()> {
@@ -816,7 +815,8 @@ mod tests {
 
     #[test]
     fn html_has_required_product_surfaces() {
-        assert!(INDEX_HTML.contains("Ledger freshness monitor"));
+        assert!(INDEX_HTML.contains("Local/backend boundary"));
+        assert!(INDEX_HTML.contains("Checking account ledger freshness"));
         assert!(INDEX_HTML.contains("Trust Engine"));
         assert!(INDEX_HTML.contains("ML signal layer"));
         assert!(INDEX_HTML.contains("Backend settlement boundaries"));
@@ -860,7 +860,8 @@ mod tests {
         with_isolated_app_env(|| {
             let response = request("GET", "/");
             assert!(response.starts_with("HTTP/1.1 200 OK"));
-            assert!(response.contains("Content-Security-Policy: default-src 'self'; script-src 'self';"));
+            assert!(response
+                .contains("Content-Security-Policy: default-src 'self'; script-src 'self';"));
             assert!(response.contains("X-Content-Type-Options: nosniff"));
             assert!(response.contains("Referrer-Policy: no-referrer"));
             assert!(response.contains("Cache-Control: no-store"));
@@ -889,6 +890,8 @@ mod tests {
                 "skills",
                 "hermes",
                 "install/status",
+                "install/enable",
+                "install/repair",
                 "stripe",
                 "trust",
                 "developer-note",
@@ -896,6 +899,14 @@ mod tests {
                 let value = api_payload(endpoint).unwrap();
                 assert!(value.is_some(), "missing endpoint {endpoint}");
                 serde_json::to_vec(&value.unwrap()).unwrap();
+            }
+            for endpoint in ["install/enable", "install/repair"] {
+                let value = api_payload(endpoint).unwrap().unwrap();
+                let body = serde_json::to_string(&value).unwrap();
+                assert!(body.contains("Run the CLI installer from a trusted terminal"));
+                assert!(!body.contains("/v1/metrics"));
+                assert!(!body.contains("/v1/events"));
+                assert!(!body.contains("api.stripe.com"));
             }
             assert!(api_payload("missing").unwrap().is_none());
         });
