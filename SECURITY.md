@@ -85,6 +85,7 @@ payout windows before it can become payable.
 Unofficial adapters, local dashboard actions, diagnostics, slash commands,
 repair tests, and generated notes stay in `probe_non_earning` or
 `observed_local` states.
+Those local states are never payable and must not be promoted by local code.
 
 ### Backend Trust And Settlement
 

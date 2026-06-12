@@ -457,12 +457,27 @@ them as settled value.
 
 ## Roadmap
 
-Local next steps:
+This roadmap separates the shipped Phase 0 desktop control plane from backend
+product work. Phase names below are planning labels, not claims that this local
+repository has shipped backend settlement features.
 
-- keep the desktop console polished around install state, Trust Engine evidence,
-  sync freshness, Hermes status, and developer note surfaces;
-- add stronger API snapshots for README/PR screenshots;
-- keep `kb top` as the compact local archive view below the desktop product.
+| Phase | Scope |
+| :---- | :---- |
+| 0 | Local desktop control plane, installer/repair, Hermes/Claude/Codex skills, Trust Engine report, sync freshness, developer note, and local archive/TUI companion. |
+| 1 | Official adapter receipts for every earning surface, with signed candidate events and nonce-backed threshold proof. |
+| 2 | Append-only event classification ledgers for accepted, held, capped, rejected, refunded, fraudulent, reversed, and final billable states. |
+| 3 | Advertiser assurance reports that separate gross events, held events, rejected or fraudulent events, refunds, final billable reach, and payout-released counts. |
+| 4 | Stripe Connect readiness and payout holds as backend-owned state displayed locally only when the backend provides it. |
+| 5 | Trust Engine operations: deterministic policy, manual review queues, fraud-cluster evidence, cap arithmetic, refund windows, and reversal workflows. |
+| 6 | ML fraud signals trained from known bot/farm labels and reviewed clean users, with policy and manual review retaining settlement authority. |
+| 7 | Reward Exchange backend ledgers for cash, optional sponsor-funded credits, blended rewards, multipliers, linked vendor accounts, holds, and reversals. |
+| 8 | Telegram and Discord as official adapters only if they meet the same attestation, cap, hold, refund, reversal, and advertiser assurance contract. |
+| 9 | Backend-provided account, reward, hold, reversal, and advertiser-proof snapshots surfaced in the desktop without local balance invention. |
+| 10 | Governance, audit exports, incident response, and responsible disclosure loops for advertiser and developer trust. |
+
+Near-term local work stays focused on the desktop console, install state, Trust
+Engine evidence, sync freshness, Hermes status, screenshots, and keeping `kb top`
+as the compact archive view below the desktop product.
 
 Backend/product next steps:
 

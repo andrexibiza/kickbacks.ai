@@ -97,11 +97,27 @@ and developer experience.
 - No claim that local archive sightings are billable events.
 - No claim that Telegram or Discord adapters are shipped here.
 - No categorical claim that desktop, command-line, Telegram, Discord, chat, or
-  agent workflow surfaces are future-only; Axl's system already monetizes them
-  through official opt-in adapters with backend attestation and settlement
-  gates.
+  agent workflow surfaces can never monetize; they can when Kickback.ai ships
+  official opt-in adapters with backend attestation and settlement gates.
 - No insult to the current product; the language treats this as a trust and
   packaging layer over what already exists.
+
+## Phase roadmap
+
+- Phase 0 ships the local desktop control plane, installer/repair, Hermes,
+  Claude, Codex, Trust Engine reporting, sync freshness, developer note, and
+  archive/TUI companion.
+- Phases 1-6 are backend trust work: official adapter receipts, event ledgers,
+  advertiser assurance, Stripe payout readiness, deterministic review, and ML
+  risk signals that never become settlement authority by themselves.
+- Phase 7 is Reward Exchange, with cash still first-class and sponsor-funded
+  credits optional, offer-based, backend-ledgered, held, reversible, and clearly
+  labeled as credits.
+- Phase 8 is Telegram/Discord only as future official adapter surfaces if they
+  meet the same attestation, cap, hold, refund, reversal, and advertiser
+  assurance requirements.
+- Phases 9-10 cover backend-provided account/reward snapshots, audit exports,
+  incident response, and responsible disclosure loops.
 
 ## Checks
 
@@ -119,4 +135,5 @@ Docs sanity checks:
 ```bash
 rg -n "TODO|FIXME|guaranteed|free money|instant payout|local payout|local credit|bot-proof" README.md SECURITY.md PR_DESCRIPTION.md
 rg -n "official opt-in|probe/test/repair|unauthenticated|non-consensual|locally self-settled|Telegram|Discord|Reward Exchange|backend" README.md SECURITY.md PR_DESCRIPTION.md
+rg -n -i "Hermes|Telegram|Discord|Reward Exchange|official adapter|backend" README.md TRUST_ENGINE.md SECURITY.md PR_DESCRIPTION.md
 ```
