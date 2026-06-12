@@ -13,6 +13,9 @@ use crate::{developer_note, integrations, paths, sync_health, trust_engine, util
 pub const DEFAULT_PORT: u16 = 38241;
 const FIGMA_CAPTURE_SCRIPT: &str = "https://mcp.figma.com/mcp/html-to-design/capture.js";
 const FIGMA_CAPTURE_ALLOWED_IN_THIS_BUILD: bool = cfg!(debug_assertions);
+const FIGMA_CAPTURE_ENV: &str = "KICKBACKS_APP_FIGMA_CAPTURE";
+const APP_DEV_ENV: &str = "KICKBACKS_APP_DEV";
+const APP_ENV: &str = "KICKBACKS_APP_ENV";
 
 #[derive(Debug, Serialize)]
 struct ArchivePayload {
@@ -74,7 +77,7 @@ fn validate_bind_host(host: &str, allow_unsafe_public_bind: bool) -> Result<()> 
         return Ok(());
     }
     bail!(
-        "refusing to bind Kickback.ai desktop console to non-loopback host '{host}'; expose it only through an explicit unsafe public-bind flag"
+        "refusing to bind Kickback.ai desktop console to non-loopback host '{host}'; default app policy is loopback-only"
     );
 }
 
@@ -216,14 +219,27 @@ fn dashboard_html(capture_enabled: bool) -> String {
 
 fn figma_capture_enabled() -> bool {
     FIGMA_CAPTURE_ALLOWED_IN_THIS_BUILD
-        && std::env::var("KICKBACKS_APP_FIGMA_CAPTURE")
-            .map(|value| {
-                matches!(
-                    value.to_ascii_lowercase().as_str(),
-                    "1" | "true" | "yes" | "dev"
-                )
-            })
-            .unwrap_or(false)
+        && env_flag_enabled(FIGMA_CAPTURE_ENV)
+        && (env_flag_enabled(APP_DEV_ENV)
+            || std::env::var(APP_ENV)
+                .map(|value| {
+                    matches!(
+                        value.trim().to_ascii_lowercase().as_str(),
+                        "dev" | "development" | "local"
+                    )
+                })
+                .unwrap_or(false))
+}
+
+fn env_flag_enabled(key: &str) -> bool {
+    std::env::var(key)
+        .map(|value| {
+            matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes" | "on" | "enabled"
+            )
+        })
+        .unwrap_or(false)
 }
 
 fn content_security_policy(capture_enabled: bool) -> &'static str {
@@ -775,14 +791,20 @@ mod tests {
         let db = root.join("kickbacks.db");
         let old_db = std::env::var_os("KICKBACKS_KIT_DB");
         let old_vibe = std::env::var_os("KICKBACKS_VIBE_DIR");
-        let old_figma = std::env::var_os("KICKBACKS_APP_FIGMA_CAPTURE");
+        let old_figma = std::env::var_os(FIGMA_CAPTURE_ENV);
+        let old_app_dev = std::env::var_os(APP_DEV_ENV);
+        let old_app_env = std::env::var_os(APP_ENV);
         std::env::set_var("KICKBACKS_KIT_DB", &db);
         std::env::set_var("KICKBACKS_VIBE_DIR", &vibe);
-        std::env::remove_var("KICKBACKS_APP_FIGMA_CAPTURE");
+        std::env::remove_var(FIGMA_CAPTURE_ENV);
+        std::env::remove_var(APP_DEV_ENV);
+        std::env::remove_var(APP_ENV);
         let out = std::panic::catch_unwind(f);
         restore_env("KICKBACKS_KIT_DB", old_db);
         restore_env("KICKBACKS_VIBE_DIR", old_vibe);
-        restore_env("KICKBACKS_APP_FIGMA_CAPTURE", old_figma);
+        restore_env(FIGMA_CAPTURE_ENV, old_figma);
+        restore_env(APP_DEV_ENV, old_app_dev);
+        restore_env(APP_ENV, old_app_env);
         let _ = std::fs::remove_dir_all(root);
         match out {
             Ok(value) => value,
@@ -870,7 +892,9 @@ mod tests {
         assert!(validate_bind_host("127.0.0.1", false).is_ok());
         assert!(validate_bind_host("localhost", false).is_ok());
         assert!(validate_bind_host("::1", false).is_ok());
-        assert!(validate_bind_host("0.0.0.0", false).is_err());
+        let err = validate_bind_host("0.0.0.0", false).unwrap_err();
+        assert!(err.to_string().contains("loopback-only"));
+        assert!(!err.to_string().contains("public-bind flag"));
         assert!(validate_bind_host("192.168.1.20", false).is_err());
         assert!(validate_bind_host("0.0.0.0", true).is_ok());
     }
@@ -886,25 +910,39 @@ mod tests {
             assert!(response.contains("Referrer-Policy: no-referrer"));
             assert!(response.contains("Cache-Control: no-store"));
             assert!(!response.contains("mcp.figma.com"));
+            assert!(!content_security_policy(false).contains("https://"));
         });
     }
 
     #[test]
     fn figma_capture_requires_explicit_dev_gate() {
-        let _guard = env_lock()
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        let old_figma = std::env::var_os("KICKBACKS_APP_FIGMA_CAPTURE");
-        std::env::remove_var("KICKBACKS_APP_FIGMA_CAPTURE");
-        assert!(!figma_capture_enabled());
-        std::env::set_var("KICKBACKS_APP_FIGMA_CAPTURE", "true");
-        assert_eq!(figma_capture_enabled(), FIGMA_CAPTURE_ALLOWED_IN_THIS_BUILD);
-        restore_env("KICKBACKS_APP_FIGMA_CAPTURE", old_figma);
+        with_isolated_app_env(|| {
+            assert!(!figma_capture_enabled());
+            std::env::set_var(FIGMA_CAPTURE_ENV, " true ");
+            assert!(!figma_capture_enabled());
+            assert!(!dashboard_html(figma_capture_enabled()).contains(FIGMA_CAPTURE_SCRIPT));
 
-        assert!(!dashboard_html(false).contains(FIGMA_CAPTURE_SCRIPT));
-        assert!(!content_security_policy(false).contains("mcp.figma.com"));
-        assert!(dashboard_html(true).contains(FIGMA_CAPTURE_SCRIPT));
-        assert!(content_security_policy(true).contains("mcp.figma.com"));
+            std::env::set_var(APP_DEV_ENV, "true");
+            assert!(figma_capture_enabled());
+            assert!(dashboard_html(figma_capture_enabled()).contains(FIGMA_CAPTURE_SCRIPT));
+            assert!(content_security_policy(figma_capture_enabled()).contains("mcp.figma.com"));
+
+            std::env::remove_var(APP_DEV_ENV);
+            std::env::set_var(APP_ENV, " development ");
+            assert!(figma_capture_enabled());
+        });
+    }
+
+    #[test]
+    fn figma_capture_cannot_be_enabled_by_url_hash() {
+        with_isolated_app_env(|| {
+            let response = request("GET", "/?figma=1#figma-capture");
+            assert!(response.starts_with("HTTP/1.1 200 OK"));
+            assert!(!response.contains(FIGMA_CAPTURE_SCRIPT));
+            assert!(!response.contains("mcp.figma.com"));
+            assert!(!INDEX_HTML.contains("location.hash"));
+            assert!(!SCRIPT.contains("location.hash"));
+        });
     }
 
     #[test]
