@@ -10,11 +10,15 @@ local observation/probe state, permits official opt-in adapter candidates, names
 backend-required gates, and exposes a founder-facing contract. It does not
 settle money or final billable reach.
 
+Local observations are evidence for display and reconciliation. They are not
+backend-owned certainty about adapter acceptance, advertiser billing, payout
+eligibility, fraud clearance, refund finality, or Stripe release.
+
 ## Core Invariant
 
-Official opt-in earning adapters are already working in Axl's system across
-CLI/TUI, desktop, Telegram, Discord, Hermes, and agent workflow surfaces. They
-create earning candidates, not payouts.
+Official opt-in earning adapters may run across CLI/TUI, desktop, Telegram,
+Discord, Hermes, and agent workflow surfaces. They create earning candidates,
+not payouts.
 
 Every agent interaction with developer attention can be advertising inventory
 only when it is an official opt-in adapter with visibility proof, backend
@@ -24,11 +28,11 @@ gates.
 No event can become payable from local observation, installer probe, dashboard
 state, skill output, repair flow, unauthenticated adapter telemetry, or a plain
 bot/status message. Telegram, Discord, CLI/TUI, desktop, and agent workflow
-surfaces monetize in Axl's system only when they run an official opt-in adapter
-with proof and backend settlement gates.
+surfaces may monetize only when they run an official opt-in adapter with proof
+and backend settlement gates.
 
-Only the backend trust service can move an event into a payable state after
-these gates clear:
+Only backend-owned trust, billing, and payout ledgers can move an event into a
+payable state after these gates clear:
 
 1. official adapter attestation,
 2. sync reconciliation,
@@ -36,7 +40,7 @@ these gates clear:
 4. cap and velocity limits,
 5. cluster and invalid-traffic filtering,
 6. advertiser refund buffer,
-7. payout hold window,
+7. payout hold and reversal window,
 8. Stripe/1099 payout readiness.
 
 The Phase 0 payout posture should be explicit: payouts are reviewed for fraud,
@@ -47,10 +51,10 @@ model signals, review queues, and advertiser-visible evidence.
 ## Official Adapter Contract
 
 Official opt-in earning adapters are the only path from developer activity to
-an earning candidate. They already exist in Axl's system on CLI/TUI, desktop,
-Telegram, Discord, Hermes, and agent workflow surfaces. Dashboard, doctor,
-repair, skills, bots, status views, and tests remain non-earning probe surfaces
-unless they are the signed registered opt-in adapter for that surface.
+an earning candidate. They may exist on CLI/TUI, desktop, Telegram, Discord,
+Hermes, and agent workflow surfaces. Dashboard, doctor, repair, skills, bots,
+status views, and tests remain non-earning probe surfaces unless they are the
+signed registered opt-in adapter for that surface.
 
 An earning adapter should provide:
 
@@ -78,10 +82,10 @@ populate those counts from local evidence.
 
 | State | Can enter advertiser billing ledger | Can enter developer reward ledger | Meaning |
 | :---- | :---------------------------------- | :-------------------------------- | :------ |
-| `probe_non_earning` | no | no | Install, repair, dashboard, skills, bots, status views, and diagnostics only. |
+| `probe` | no | no | Install, repair, dashboard, skills, bots, status views, and diagnostics only. |
 | `observed_local` | no | no | Local archive saw a creative; useful proof, not billable. |
 | `candidate_adapter_attested` | no | no | Official opt-in adapter claims user opt-in, render, receipt, and wait-state threshold. |
-| `held_for_review` | no | no | Sync, cap, velocity, cluster, refund-window, or payout-hold review. |
+| `held_for_review` | no | no | Sync, cap, velocity, cluster, refund-window, payout-hold, or reversal-window review. |
 | `eligible_but_capped` | no | no | Real attention but no incremental bill or payout beyond policy caps. |
 | `backend_accepted` | backend only | no | Backend accepted the event into a billable ledger; payout still waits. |
 | `accepted_billable_after_refund_window` | backend only | backend only | Final enough for payout release. |
@@ -96,7 +100,7 @@ Local and probe states are terminal from the local surface's point of view:
 
 | From | To | Owner | Money impact |
 | :--- | :-- | :---- | :----------- |
-| `probe_non_earning` | `probe_non_earning` | installer, repair, doctor, dashboard, skill, bot, or diagnostic surface | never billable, never payable |
+| `probe` | `probe` | installer, repair, doctor, dashboard, skill, bot, or diagnostic surface | never billable, never payable |
 | `observed_local` | `observed_local` | local archive | never billable, never payable |
 | `candidate_adapter_attested` | `candidate_adapter_attested` | official opt-in adapter on an approved surface | candidate only; never billable or payable by itself |
 | `candidate_adapter_attested` | `held_for_review` / `eligible_but_capped` / `backend_accepted` / `rejected` / `fraudulent` | backend trust service | backend may create billable status only at `backend_accepted` |
@@ -139,8 +143,8 @@ Advertisers need evidence that the bot problem is contained, not a generic
 | `held_events` | Events blocked pending sync, cap, cluster, review, refund, or payout-hold clearance. |
 | `rejected_or_fraudulent_events` | Events removed with terminal reason codes. |
 | `refunded_events` | Previously billed events credited back to advertisers. |
-| `final_billable_reach` | Events remaining after invalid-traffic filtering, caps, holds, and refunds. |
-| `payouts_released_after_trust_window` | Developer cash payouts released only after gates clear. |
+| `final_billable_reach` | Events remaining after invalid-traffic filtering, caps, holds, refunds, and reversals. |
+| `payout_releases_after_trust_window` | Developer cash payout releases counted only after gates clear. |
 
 Required ledgers:
 
@@ -152,9 +156,9 @@ Required ledgers:
 
 ## Reward Exchange Boundary
 
-Reward Exchange is a future backend roadmap layer, not part of the Phase 0
-state machine and not a local surface feature. The Trust Engine should support
-it later without weakening the cash payout contract.
+Reward Exchange is a backend roadmap layer, not a local desktop feature. The
+Trust Engine should support it without weakening the cash payout contract. It is
+not an event state in the Phase 0 state machine above.
 
 Rules:
 
