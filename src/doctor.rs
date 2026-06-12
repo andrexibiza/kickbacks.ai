@@ -10,6 +10,10 @@ use crate::{integrations, paths, sources, sync_health, trust_engine, util};
 /// How fresh `cli-ad.json` must be to count as a live ad (matches the
 /// extension's own 10-minute freshness window).
 const FRESH_MS: i64 = 600_000;
+const SIGNED_OUT_DETAIL: &str =
+    "no - sign in through an official opt-in adapter before expecting eligible earning candidates";
+const PROBE_MODE_DETAIL: &str =
+    "doctor/install/repair/skills/generated plugin tools inspect local state only and do not create billing, payout, or payable events";
 
 pub fn run() -> Result<()> {
     println!("{}", "kickbacks-kit · doctor".bold());
@@ -50,11 +54,7 @@ pub fn run() -> Result<()> {
     check(
         "signed in to kickbacks",
         signed,
-        if signed {
-            "yes"
-        } else {
-            "no — sign in via VS Code so earnings accrue"
-        },
+        if signed { "yes" } else { SIGNED_OUT_DETAIL },
     );
 
     let ad_fresh = sources::read_cli_ad()?
@@ -128,11 +128,7 @@ pub fn run() -> Result<()> {
         system.stripe.note,
     );
 
-    check(
-        "non-earning probe mode",
-        true,
-        "doctor/install/repair/skills inspect local state and do not create payable events",
-    );
+    check("non-earning probe mode", true, PROBE_MODE_DETAIL);
 
     println!();
     println!(
@@ -149,4 +145,19 @@ fn check(label: &str, ok: bool, detail: &str) {
         "•".yellow().to_string()
     };
     println!("  {mark} {:<26} {}", label, detail.dim());
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn doctor_copy_keeps_probe_and_trust_boundaries() {
+        assert!(SIGNED_OUT_DETAIL.contains("official opt-in adapter"));
+        assert!(SIGNED_OUT_DETAIL.contains("eligible earning candidates"));
+        assert!(PROBE_MODE_DETAIL.contains("inspect local state only"));
+        assert!(PROBE_MODE_DETAIL.contains("do not create billing, payout, or payable events"));
+        assert!(!SIGNED_OUT_DETAIL.contains("earnings accrue"));
+        assert!(!PROBE_MODE_DETAIL.contains("can create payable"));
+    }
 }
