@@ -1,8 +1,8 @@
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use serde::Serialize;
 use serde_json::json;
 use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
+use std::net::{IpAddr, TcpListener, TcpStream};
 use std::process::Command;
 use std::thread;
 use std::time::Duration;
@@ -11,6 +11,7 @@ use crate::archive::Archive;
 use crate::{developer_note, integrations, paths, sync_health, trust_engine, util};
 
 pub const DEFAULT_PORT: u16 = 38241;
+const FIGMA_CAPTURE_SCRIPT: &str = "https://mcp.figma.com/mcp/html-to-design/capture.js";
 
 #[derive(Debug, Serialize)]
 struct ArchivePayload {
@@ -21,6 +22,16 @@ struct ArchivePayload {
 }
 
 pub fn run(host: String, port: u16, open: bool) -> Result<()> {
+    run_with_bind_policy(host, port, open, false)
+}
+
+pub fn run_with_bind_policy(
+    host: String,
+    port: u16,
+    open: bool,
+    allow_unsafe_public_bind: bool,
+) -> Result<()> {
+    validate_bind_host(&host, allow_unsafe_public_bind)?;
     let listener = TcpListener::bind((host.as_str(), port))
         .with_context(|| format!("binding http://{host}:{port}"))?;
     let url = format!("http://{host}:{port}");
@@ -45,9 +56,29 @@ pub fn run(host: String, port: u16, open: bool) -> Result<()> {
 }
 
 pub fn print_api(path: &str) -> Result<()> {
-    let value = api_payload(path)?;
+    let value = api_payload(path)?.with_context(|| format!("unknown app API endpoint: {path}"))?;
     println!("{}", serde_json::to_string_pretty(&value)?);
     Ok(())
+}
+
+fn validate_bind_host(host: &str, allow_unsafe_public_bind: bool) -> Result<()> {
+    if allow_unsafe_public_bind {
+        return Ok(());
+    }
+    let normalized = host.trim().trim_start_matches('[').trim_end_matches(']');
+    if normalized.eq_ignore_ascii_case("localhost") {
+        return Ok(());
+    }
+    if normalized
+        .parse::<IpAddr>()
+        .map(|ip| ip.is_loopback())
+        .unwrap_or(false)
+    {
+        return Ok(());
+    }
+    bail!(
+        "refusing to bind Kickbacks desktop console to non-loopback host '{host}'; expose it only through an explicit unsafe public-bind flag"
+    );
 }
 
 fn handle(mut stream: TcpStream) -> Result<()> {
@@ -62,17 +93,20 @@ fn handle(mut stream: TcpStream) -> Result<()> {
     let mut parts = line.split_whitespace();
     let method = parts.next().unwrap_or("");
     let target = parts.next().unwrap_or("/");
-    if method != "GET" && method != "POST" {
+    if method != "GET" {
         return write_response(&mut stream, 405, "text/plain", b"method not allowed");
     }
     let path = target.split('?').next().unwrap_or("/");
     match path {
-        "/" | "/index.html" => write_response(
-            &mut stream,
-            200,
-            "text/html; charset=utf-8",
-            INDEX_HTML.as_bytes(),
-        ),
+        "/" | "/index.html" => {
+            let body = dashboard_html(figma_capture_enabled());
+            write_response(
+                &mut stream,
+                200,
+                "text/html; charset=utf-8",
+                body.as_bytes(),
+            )
+        }
         "/styles.css" => write_response(
             &mut stream,
             200,
@@ -85,46 +119,53 @@ fn handle(mut stream: TcpStream) -> Result<()> {
             "application/javascript; charset=utf-8",
             SCRIPT.as_bytes(),
         ),
-        path if path.starts_with("/api/") => {
-            let value = api_payload(path.trim_start_matches("/api/"))?;
-            let body = serde_json::to_vec_pretty(&value)?;
-            write_response(&mut stream, 200, "application/json; charset=utf-8", &body)
-        }
+        path if path.starts_with("/api/") => match api_payload(path.trim_start_matches("/api/"))? {
+            Some(value) => {
+                let body = serde_json::to_vec_pretty(&value)?;
+                write_response(&mut stream, 200, "application/json; charset=utf-8", &body)
+            }
+            None => write_response(
+                &mut stream,
+                404,
+                "application/json; charset=utf-8",
+                br#"{"error":"unknown endpoint"}"#,
+            ),
+        },
         _ => write_response(&mut stream, 404, "text/plain", b"not found"),
     }
 }
 
-fn api_payload(path: &str) -> Result<serde_json::Value> {
+fn api_payload(path: &str) -> Result<Option<serde_json::Value>> {
     let path = path.trim_matches('/');
-    match path {
+    let value = match path {
         "health" => {
             let archive = Archive::open(&paths::db_path()?)?;
-            Ok(json!({
+            json!({
                 "ok": true,
                 "now_ms": util::now_ms(),
                 "sync": sync_health::current(&archive)?,
                 "system": integrations::system_status()?,
                 "developer_note": developer_note::note(),
-            }))
+            })
         }
         "account" => {
             let archive = Archive::open(&paths::db_path()?)?;
-            Ok(json!({
+            json!({
                 "auth": integrations::auth_status()?,
                 "sync": sync_health::current(&archive)?,
                 "paths": integrations::app_data_paths()?,
-            }))
+            })
         }
         "earnings" => {
             let archive = Archive::open(&paths::db_path()?)?;
             let stats = archive.stats(util::now_ms())?;
-            Ok(json!({
+            json!({
                 "source": "local_archive_plus_account_sync_monitor",
                 "note": "Actual account earnings are backend-owned. This local app does not invent balances.",
                 "portfolio_url": crate::render::PORTFOLIO_URL,
                 "stats": stats,
                 "sync": sync_health::current(&archive)?,
-            }))
+            })
         }
         "archive" => {
             let archive = Archive::open(&paths::db_path()?)?;
@@ -134,33 +175,64 @@ fn api_payload(path: &str) -> Result<serde_json::Value> {
                 recent: archive.recent_ledger(20)?,
                 activity: archive.hourly_activity(util::now_ms(), 24)?,
             };
-            Ok(serde_json::to_value(payload)?)
+            serde_json::to_value(payload)?
         }
         "trust" => {
             let archive = Archive::open(&paths::db_path()?)?;
-            Ok(serde_json::to_value(trust_engine::current(&archive)?)?)
+            serde_json::to_value(trust_engine::current(&archive)?)?
         }
-        "apps" | "cli" => Ok(json!({ "integrations": integrations::integrations()? })),
-        "skills" => Ok(json!({ "skills": integrations::skills()? })),
+        "apps" | "cli" => json!({ "integrations": integrations::integrations()? }),
+        "skills" => json!({ "skills": integrations::skills()? }),
         "hermes" => {
             let system = integrations::system_status()?;
-            Ok(json!({
+            json!({
                 "integration": system.integrations.into_iter().find(|i| i.id == "hermes"),
                 "skills": system.skills.into_iter().filter(|s| s.id == "hermes").collect::<Vec<_>>(),
-            }))
+            })
         }
-        "install/status" => Ok(serde_json::to_value(integrations::system_status()?)?),
-        "install/enable" | "install/repair" => Ok(json!({
+        "install/status" => serde_json::to_value(integrations::system_status()?)?,
+        "install/enable" | "install/repair" => json!({
             "ok": true,
             "safe_action": "Run the CLI installer from a trusted terminal.",
             "commands": [
                 "kickbacks install --all --yes",
                 "kickbacks repair --all --yes"
             ]
-        })),
-        "stripe" => Ok(serde_json::to_value(integrations::stripe_status())?),
-        "developer-note" | "note-to-developer" => Ok(serde_json::to_value(developer_note::note())?),
-        _ => Ok(json!({ "error": "unknown endpoint", "path": path })),
+        }),
+        "stripe" => serde_json::to_value(integrations::stripe_status())?,
+        "developer-note" | "note-to-developer" => serde_json::to_value(developer_note::note())?,
+        _ => return Ok(None),
+    };
+    Ok(Some(value))
+}
+
+fn dashboard_html(capture_enabled: bool) -> String {
+    if capture_enabled {
+        INDEX_HTML.replace(
+            "</head>",
+            &format!("  <script src=\"{FIGMA_CAPTURE_SCRIPT}\" defer></script>\n</head>"),
+        )
+    } else {
+        INDEX_HTML.to_string()
+    }
+}
+
+fn figma_capture_enabled() -> bool {
+    std::env::var("KICKBACKS_APP_FIGMA_CAPTURE")
+        .map(|value| {
+            matches!(
+                value.to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes" | "dev"
+            )
+        })
+        .unwrap_or(false)
+}
+
+fn content_security_policy(capture_enabled: bool) -> &'static str {
+    if capture_enabled {
+        "default-src 'self'; script-src 'self' https://mcp.figma.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://mcp.figma.com; img-src 'self' data: https://mcp.figma.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'"
+    } else {
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'"
     }
 }
 
@@ -176,9 +248,10 @@ fn write_response(
         405 => "Method Not Allowed",
         _ => "OK",
     };
+    let csp = content_security_policy(figma_capture_enabled());
     write!(
         stream,
-        "HTTP/1.1 {status} {status_text}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
+        "HTTP/1.1 {status} {status_text}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nContent-Security-Policy: {csp}\r\nX-Content-Type-Options: nosniff\r\nReferrer-Policy: no-referrer\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
         body.len()
     )?;
     stream.write_all(body)?;
@@ -207,22 +280,14 @@ const INDEX_HTML: &str = r###"<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Kickbacks.ai Revenue Console</title>
+  <title>Kickbacks.ai Trust Console</title>
   <link rel="stylesheet" href="/styles.css">
-  <script>
-    if (location.hash.includes('figmacapture=')) {
-      const figmaCapture = document.createElement('script');
-      figmaCapture.src = 'https://mcp.figma.com/mcp/html-to-design/capture.js';
-      figmaCapture.async = true;
-      document.head.appendChild(figmaCapture);
-    }
-  </script>
 </head>
 <body>
   <aside class="rail">
     <div class="brand"><span class="mark">K$</span><strong>Kickbacks.ai</strong></div>
     <nav>
-      <a class="active" href="#dashboard">Dashboard</a>
+      <a class="active" href="#dashboard">Local Ledger</a>
       <a href="#sync">Sync Monitor</a>
       <a href="#trust">Trust Engine</a>
       <a href="#surfaces">Surfaces</a>
@@ -230,47 +295,47 @@ const INDEX_HTML: &str = r###"<!doctype html>
       <a href="#developer-note">Founder Note</a>
     </nav>
     <section class="system-mini">
-      <div class="mini-row"><span>Local API</span><strong>Healthy</strong></div>
+      <div class="mini-row"><span>Local API</span><strong>This machine</strong></div>
       <div class="mini-row"><span>Theme</span><strong>Dark only</strong></div>
-      <div class="mini-row"><span>Integrity</span><strong>Read-only</strong></div>
+      <div class="mini-row"><span>Settlement</span><strong>Backend-owned</strong></div>
     </section>
   </aside>
   <main>
     <header class="topbar">
       <div>
-        <span class="overline">Kickbacks.ai command center</span>
-        <h1>Earning trust console</h1>
+        <span class="overline">Local desktop console</span>
+        <h1>Trust console for real earning surfaces</h1>
       </div>
       <div class="top-status">
-        <span id="sync-pill" class="pill">Loading sync</span>
+        <span id="sync-pill" class="pill">Loading local sync</span>
         <span class="pill">No light mode</span>
       </div>
     </header>
 
     <section id="sync" class="incident panel">
       <div>
-        <span class="overline">Ledger freshness monitor</span>
+        <span class="overline">Local/backend boundary</span>
         <h2 id="sync-title">Checking account ledger freshness</h2>
-        <p id="sync-message">Reading local adapter sends, auth health, and visible account watermark.</p>
+        <p id="sync-message">Reading local adapter sends, auth health, and visible account ledger watermark. This app observes; the backend settles.</p>
       </div>
       <div class="incident-grid">
-        <div><span>Last local metric</span><strong id="last-metric">--</strong></div>
+        <div><span>Last adapter send</span><strong id="last-metric">--</strong></div>
         <div><span>Account ledger sync</span><strong id="account-sync">--</strong></div>
         <div><span>Events after ledger</span><strong id="events-after">--</strong></div>
         <div><span>Auth failure</span><strong id="auth-failure">--</strong></div>
-        <div><span>Payment transport</span><strong id="transport-status">Backend-owned</strong></div>
+        <div><span>Settlement owner</span><strong id="transport-status">Backend-owned</strong></div>
       </div>
     </section>
 
     <section id="dashboard" class="kpis">
-      <article class="panel kpi"><span>Local sightings</span><strong id="sightings">--</strong><small>Observed locally</small></article>
-      <article class="panel kpi"><span>Advertisers</span><strong id="advertisers">--</strong><small>Unique brands</small></article>
-      <article class="panel kpi"><span>Ads seen</span><strong id="ads-seen">--</strong><small>Distinct creatives</small></article>
-      <article class="panel kpi"><span>Stripe readiness</span><strong id="stripe-ready">Backend-owned</strong><small>Connect v2 contract</small></article>
+      <article class="panel kpi"><span>Local observations</span><strong id="sightings">--</strong><small>Local archive only</small></article>
+      <article class="panel kpi"><span>Observed advertisers</span><strong id="advertisers">--</strong><small>Unique local names</small></article>
+      <article class="panel kpi"><span>Creatives seen</span><strong id="ads-seen">--</strong><small>Distinct local creatives</small></article>
+      <article class="panel kpi"><span>Payout rail</span><strong id="stripe-ready">Backend-owned</strong><small>Stripe Connect boundary</small></article>
     </section>
 
     <section id="trust" class="trust panel">
-      <div class="section-head"><div><span class="overline">Trust Engine</span><h2>Settlement state machine</h2></div><button data-command="kickbacks trust">Open report</button></div>
+      <div class="section-head"><div><span class="overline">Trust Engine</span><h2>Backend settlement boundaries</h2></div><button data-command="kickbacks trust">Open local report</button></div>
       <p id="trust-pitch">Loading two-way trust ledger.</p>
       <div class="trust-grid">
         <div><span>User risk</span><strong id="user-risk">--</strong><small id="user-risk-band">--</small></div>
@@ -315,7 +380,7 @@ const INDEX_HTML: &str = r###"<!doctype html>
 
     <section class="grid">
       <article class="panel wide">
-        <div class="section-head"><div><span class="overline">Local activity</span><h2>Last 24 hours</h2></div><button data-command="kickbacks sync status">Sync status</button></div>
+        <div class="section-head"><div><span class="overline">Local archive</span><h2>Observed last 24 hours</h2></div><button data-command="kickbacks sync status">Sync status</button></div>
         <div id="bars" class="bars"></div>
       </article>
       <article id="surfaces" class="panel">
@@ -326,7 +391,7 @@ const INDEX_HTML: &str = r###"<!doctype html>
 
     <section class="grid">
       <article class="panel">
-        <div class="section-head"><div><span class="overline">Market pulse</span><h2>Advertiser mix</h2></div></div>
+        <div class="section-head"><div><span class="overline">Local archive</span><h2>Observed advertiser mix</h2></div></div>
         <div id="leaderboard" class="table"></div>
       </article>
       <article class="panel">
@@ -336,7 +401,7 @@ const INDEX_HTML: &str = r###"<!doctype html>
     </section>
 
     <section id="stripe" class="panel">
-      <div class="section-head"><div><span class="overline">Stripe Connect</span><h2>Real-world payout contract</h2></div></div>
+      <div class="section-head"><div><span class="overline">Stripe Connect</span><h2>Backend payout rail</h2></div></div>
       <p id="stripe-note"></p>
       <div class="stripe-grid">
         <div><span>API version</span><strong id="stripe-api">--</strong></div>
@@ -534,6 +599,13 @@ li { margin: 8px 0; }
 const SCRIPT: &str = r###"
 const fmt = (ms) => ms ? new Date(ms).toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'}) : '--';
 const short = (s, n = 42) => !s ? '--' : (s.length > n ? s.slice(0, n - 1) + '...' : s);
+const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (ch) => ({
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;',
+}[ch]));
 
 async function get(path) {
   const r = await fetch(path, {cache: 'no-store'});
@@ -559,7 +631,7 @@ function renderSync(sync) {
   document.getElementById('account-sync').textContent = fmt(sync.account_ledger_last_synced_ms);
   document.getElementById('events-after').textContent = String(sync.local_events_after_account_sync ?? 0);
   document.getElementById('auth-failure').textContent = sync.last_auth_failure_ms ? fmt(sync.last_auth_failure_ms) + ' / ' + (sync.last_auth_failure_reason || 'unknown') : 'none in tail';
-  document.getElementById('transport-status').textContent = sync.payment_transport_status || 'backend-owned';
+  document.getElementById('transport-status').textContent = sync.payment_transport_status || 'backend-owned settlement';
 }
 
 function renderArchive(data) {
@@ -572,24 +644,24 @@ function renderArchive(data) {
     return `<div class="bar ${v == null ? 'gap' : ''}" style="height:${h}px" title="${v == null ? 'not observed' : v + ' sightings'}"></div>`;
   }).join('');
   document.getElementById('leaderboard').innerHTML = data.leaderboard.map((r, i) =>
-    `<div class="row"><strong>${i + 1}. ${short(r.advertiser, 24)}</strong><span>${r.sightings} sightings</span><span>${r.distinct_ads} ads</span></div>`
-  ).join('') || '<div class="row">No advertisers captured yet</div>';
+    `<div class="row"><strong>${i + 1}. ${escapeHtml(short(r.advertiser, 24))}</strong><span>${escapeHtml(r.sightings)} observations</span><span>${escapeHtml(r.distinct_ads)} creatives</span></div>`
+  ).join('') || '<div class="row">No local advertiser observations yet</div>';
   document.getElementById('ledger').innerHTML = data.recent.slice(0, 8).map((r) =>
-    `<div class="row"><strong>${short(r.advertiser, 18)}</strong><span>${fmt(r.observed_ms)}</span><span>${short(r.ad_id, 12)}</span></div>`
+    `<div class="row"><strong>${escapeHtml(short(r.advertiser, 18))}</strong><span>${escapeHtml(fmt(r.observed_ms))}</span><span>${escapeHtml(short(r.ad_id, 12))}</span></div>`
   ).join('') || '<div class="row">No local ledger rows yet</div>';
 }
 
 function renderIntegrations(items) {
   document.getElementById('integrations').innerHTML = items.map(item => `
     <div class="integration">
-      <div><strong>${item.label}</strong><small>${short(item.detail, 68)}</small></div>
+      <div><strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(short(item.detail, 68))}</small></div>
       <div class="state ${item.enabled ? '' : 'warn'}">${item.enabled ? 'Active' : (item.detected ? 'Needs setup' : 'Missing')}</div>
     </div>
   `).join('');
 }
 
 function renderStripe(s) {
-  document.getElementById('stripe-ready').textContent = s.backend_owned ? 'Connect v2' : 'Unknown';
+  document.getElementById('stripe-ready').textContent = s.backend_owned ? 'Backend-owned' : 'Unknown';
   document.getElementById('stripe-note').textContent = s.note;
   document.getElementById('stripe-api').textContent = s.api_version;
   document.getElementById('stripe-account').textContent = s.account_api;
@@ -607,27 +679,27 @@ function renderTrust(t) {
   document.getElementById('payout-holds').textContent = t.payout_hold_queue.count;
   document.getElementById('payout-reason').textContent = t.payout_hold_queue.reason;
   document.getElementById('eligibility').innerHTML = t.earning_eligibility_state.map((b) =>
-    `<div class="row"><strong>${b.state}</strong><span>${b.count == null ? 'backend' : b.count}</span><span>${short(b.payout_impact, 72)}</span></div>`
+    `<div class="row"><strong>${escapeHtml(b.state)}</strong><span>${b.count == null ? 'backend' : escapeHtml(b.count)}</span><span>${escapeHtml(short(b.payout_impact, 72))}</span></div>`
   ).join('');
   document.getElementById('advertiser-proof').innerHTML =
-    `<strong>${short(t.advertiser_protection.proof_statement, 96)}</strong><br><br>` +
+    `<strong>${escapeHtml(short(t.advertiser_protection.proof_statement, 96))}</strong><br><br>` +
     `Probe mode: ${t.non_earning_probe_mode.enabled ? 'enabled' : 'off'}<br>` +
-    `Visible non-billable: ${t.advertiser_refund_exposure.local_visible_non_billable}<br>` +
-    `Held for sync review: ${t.advertiser_refund_exposure.held_for_sync_review}`;
+    `Visible non-billable: ${escapeHtml(t.advertiser_refund_exposure.local_visible_non_billable)}<br>` +
+    `Held for sync review: ${escapeHtml(t.advertiser_refund_exposure.held_for_sync_review)}`;
   document.getElementById('finality-gates').innerHTML = t.settlement_gates.map((g) =>
-    `<div class="row"><strong>${g.gate}</strong><span>${g.blocks_payout ? 'blocks' : 'clear'}</span><span>${short(g.required_evidence, 72)}</span></div>`
+    `<div class="row"><strong>${escapeHtml(g.gate)}</strong><span>${g.blocks_payout ? 'blocks' : 'clear'}</span><span>${escapeHtml(short(g.required_evidence, 72))}</span></div>`
   ).join('');
   document.getElementById('assurance-proof').innerHTML =
-    `<strong>${short(t.advertiser_assurance.public_claim, 120)}</strong><br><br>` +
+    `<strong>${escapeHtml(short(t.advertiser_assurance.public_claim, 120))}</strong><br><br>` +
     t.advertiser_assurance.report_metrics.slice(0, 5).map((m) =>
-      `${m.metric}: ${short(m.definition, 78)}`
+      `${escapeHtml(m.metric)}: ${escapeHtml(short(m.definition, 78))}`
     ).join('<br>');
   document.getElementById('ml-layer').innerHTML =
-    `<strong>${t.ml_signal_layer.title}</strong><br><br>` +
-    `${t.ml_signal_layer.authority_boundary}<br><br>` +
-    `<span>${t.ml_signal_layer.labeled_training_data}</span>`;
+    `<strong>${escapeHtml(t.ml_signal_layer.title)}</strong><br><br>` +
+    `${escapeHtml(t.ml_signal_layer.authority_boundary)}<br><br>` +
+    `<span>${escapeHtml(t.ml_signal_layer.labeled_training_data)}</span>`;
   document.getElementById('ml-reason-codes').innerHTML =
-    t.ml_signal_layer.reason_codes.map((code) => `<div>${code}</div>`).join('');
+    t.ml_signal_layer.reason_codes.map((code) => `<div>${escapeHtml(code)}</div>`).join('');
 }
 
 function renderNote(n) {
@@ -679,21 +751,169 @@ setInterval(refresh, 15000);
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::{Read as _, Write as _};
+    use std::sync::{Mutex, OnceLock};
+
+    fn env_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+    fn with_isolated_app_env<T>(f: impl FnOnce() -> T) -> T {
+        let _guard = env_lock().lock().unwrap();
+        let root = std::env::temp_dir().join(format!(
+            "kickbacks-app-test-{}-{}",
+            std::process::id(),
+            util::now_ms()
+        ));
+        let vibe = root.join("vibe");
+        std::fs::create_dir_all(&vibe).unwrap();
+        let db = root.join("kickbacks.db");
+        let old_db = std::env::var_os("KICKBACKS_KIT_DB");
+        let old_vibe = std::env::var_os("KICKBACKS_VIBE_DIR");
+        let old_figma = std::env::var_os("KICKBACKS_APP_FIGMA_CAPTURE");
+        std::env::set_var("KICKBACKS_KIT_DB", &db);
+        std::env::set_var("KICKBACKS_VIBE_DIR", &vibe);
+        std::env::remove_var("KICKBACKS_APP_FIGMA_CAPTURE");
+        let out = f();
+        restore_env("KICKBACKS_KIT_DB", old_db);
+        restore_env("KICKBACKS_VIBE_DIR", old_vibe);
+        restore_env("KICKBACKS_APP_FIGMA_CAPTURE", old_figma);
+        let _ = std::fs::remove_dir_all(root);
+        out
+    }
+
+    fn restore_env(key: &str, value: Option<std::ffi::OsString>) {
+        if let Some(value) = value {
+            std::env::set_var(key, value);
+        } else {
+            std::env::remove_var(key);
+        }
+    }
+
+    fn request(method: &str, target: &str) -> String {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            handle(stream).unwrap();
+        });
+        let mut client = TcpStream::connect(addr).unwrap();
+        write!(
+            client,
+            "{method} {target} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
+        )
+        .unwrap();
+        let mut response = String::new();
+        client.read_to_string(&mut response).unwrap();
+        server.join().unwrap();
+        response
+    }
+
+    fn body(response: &str) -> &str {
+        response.split("\r\n\r\n").nth(1).unwrap_or_default()
+    }
 
     #[test]
     fn html_has_required_product_surfaces() {
         assert!(INDEX_HTML.contains("Ledger freshness monitor"));
         assert!(INDEX_HTML.contains("Trust Engine"));
         assert!(INDEX_HTML.contains("ML signal layer"));
-        assert!(INDEX_HTML.contains("Settlement state machine"));
+        assert!(INDEX_HTML.contains("Backend settlement boundaries"));
         assert!(INDEX_HTML.contains("Stripe Connect"));
         assert!(INDEX_HTML.contains("Founder note"));
         assert!(INDEX_HTML.contains("No light mode"));
+        assert!(INDEX_HTML.contains("Trust console for real earning surfaces"));
+        assert!(INDEX_HTML.contains("Backend-owned"));
+        assert!(!INDEX_HTML.contains("Revenue Console"));
+        assert!(!INDEX_HTML.contains("Market pulse"));
+        assert!(!INDEX_HTML.contains("location.hash"));
+        assert!(!INDEX_HTML.contains(FIGMA_CAPTURE_SCRIPT));
     }
 
     #[test]
     fn css_is_dark_only() {
         assert!(STYLES.contains("color-scheme: dark"));
         assert!(STYLES.contains("--mint"));
+    }
+
+    #[test]
+    fn script_escapes_local_archive_text_and_avoids_payout_claims() {
+        assert!(SCRIPT.contains("const escapeHtml"));
+        assert!(SCRIPT.contains("escapeHtml(short(r.advertiser"));
+        assert!(SCRIPT.contains("Backend-owned"));
+        assert!(!SCRIPT.contains("? 'Connect v2'"));
+    }
+
+    #[test]
+    fn default_bind_policy_is_loopback_only() {
+        assert!(validate_bind_host("127.0.0.1", false).is_ok());
+        assert!(validate_bind_host("localhost", false).is_ok());
+        assert!(validate_bind_host("::1", false).is_ok());
+        assert!(validate_bind_host("0.0.0.0", false).is_err());
+        assert!(validate_bind_host("192.168.1.20", false).is_err());
+        assert!(validate_bind_host("0.0.0.0", true).is_ok());
+    }
+
+    #[test]
+    fn security_headers_are_sent_with_production_csp() {
+        with_isolated_app_env(|| {
+            let response = request("GET", "/");
+            assert!(response.starts_with("HTTP/1.1 200 OK"));
+            assert!(response.contains("Content-Security-Policy: default-src 'self'; script-src 'self';"));
+            assert!(response.contains("X-Content-Type-Options: nosniff"));
+            assert!(response.contains("Referrer-Policy: no-referrer"));
+            assert!(response.contains("Cache-Control: no-store"));
+            assert!(!response.contains("mcp.figma.com"));
+        });
+    }
+
+    #[test]
+    fn figma_capture_requires_explicit_dev_gate() {
+        assert!(!dashboard_html(false).contains(FIGMA_CAPTURE_SCRIPT));
+        assert!(!content_security_policy(false).contains("mcp.figma.com"));
+        assert!(dashboard_html(true).contains(FIGMA_CAPTURE_SCRIPT));
+        assert!(content_security_policy(true).contains("mcp.figma.com"));
+    }
+
+    #[test]
+    fn api_endpoint_coverage_returns_json() {
+        with_isolated_app_env(|| {
+            for endpoint in [
+                "health",
+                "account",
+                "earnings",
+                "archive",
+                "apps",
+                "cli",
+                "skills",
+                "hermes",
+                "install/status",
+                "stripe",
+                "trust",
+                "developer-note",
+            ] {
+                let value = api_payload(endpoint).unwrap();
+                assert!(value.is_some(), "missing endpoint {endpoint}");
+                serde_json::to_vec(&value.unwrap()).unwrap();
+            }
+            assert!(api_payload("missing").unwrap().is_none());
+        });
+    }
+
+    #[test]
+    fn http_routes_unknown_api_to_404_and_non_get_to_405() {
+        with_isolated_app_env(|| {
+            let health = request("GET", "/api/health");
+            assert!(health.starts_with("HTTP/1.1 200 OK"));
+            serde_json::from_str::<serde_json::Value>(body(&health)).unwrap();
+
+            let unknown = request("GET", "/api/not-real");
+            assert!(unknown.starts_with("HTTP/1.1 404 Not Found"));
+            serde_json::from_str::<serde_json::Value>(body(&unknown)).unwrap();
+
+            let post = request("POST", "/api/health");
+            assert!(post.starts_with("HTTP/1.1 405 Method Not Allowed"));
+        });
     }
 }

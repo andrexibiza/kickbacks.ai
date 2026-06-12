@@ -59,12 +59,66 @@ pub fn repair(selection: InstallSelection) -> Result<()> {
 
 pub fn restore() -> Result<()> {
     println!("{}", "kickbacks-kit - restore".bold());
+    println!();
+
+    let home = dirs::home_dir().context("could not resolve home directory")?;
+    let mut report = RestoreReport::default();
+
+    for dir in [
+        home.join(".claude").join("skills").join("kickbacks"),
+        home.join(".codex").join("skills").join("kickbacks"),
+        home.join(".hermes").join("skills").join("kickbacks"),
+    ] {
+        restore_marker_file(&dir.join("SKILL.md"), &mut report)?;
+        remove_empty_dir(&dir)?;
+    }
+
+    let claude_commands = home.join(".claude").join("commands");
+    for name in [
+        "kbtop.md",
+        "kbstatus.md",
+        "kickbacks.md",
+        "kickbacks-status.md",
+        "kickbacks-repair.md",
+        "kickbacks-dashboard.md",
+        "kickbacks-trust.md",
+        "kickbacks-doctor.md",
+    ] {
+        restore_marker_file(&claude_commands.join(name), &mut report)?;
+    }
+
+    let hermes_commands = home.join(".hermes").join("commands");
+    for name in [
+        "kickbacks.md",
+        "kickbacks-status.md",
+        "kickbacks-repair.md",
+        "kickbacks-dashboard.md",
+        "kickbacks-sync.md",
+        "kickbacks-trust.md",
+        "kickbacks-doctor.md",
+    ] {
+        restore_marker_file(&hermes_commands.join(name), &mut report)?;
+    }
+
+    let hermes_plugin = home.join(".hermes").join("plugins").join("kickbacks");
+    for name in ["plugin.yaml", "__init__.py"] {
+        restore_marker_file(&hermes_plugin.join(name), &mut report)?;
+    }
+    remove_empty_dir(&hermes_plugin)?;
+
+    println!(
+        "  {} restore summary: {} removed, {} kept, {} missing",
+        "ok".green(),
+        report.removed,
+        report.kept,
+        report.missing
+    );
     println!(
         "  {} Use `kb uninstall-claude --yes` to restore Claude Code statusLine backup.",
         "*".yellow()
     );
     println!(
-        "  {} Skill/plugin files created by this installer are marker-owned and can be removed manually.",
+        "  {} Restore only removes marker-owned files.",
         "*".yellow()
     );
     Ok(())
@@ -180,6 +234,10 @@ fn install_claude_commands() -> Result<()> {
             "kickbacks-trust.md",
             claude_command("Kickbacks Trust Engine", "kickbacks trust"),
         ),
+        (
+            "kickbacks-doctor.md",
+            claude_command("Kickbacks doctor", "kickbacks doctor"),
+        ),
     ];
     for (name, content) in items {
         write_marker_file(&commands.join(name), &content)?;
@@ -232,6 +290,10 @@ fn install_hermes_tui_commands(home: &Path) -> Result<()> {
             "kickbacks-trust.md",
             hermes_command("Kickbacks Trust Engine", "kickbacks trust"),
         ),
+        (
+            "kickbacks-doctor.md",
+            hermes_command("Kickbacks doctor", "kickbacks doctor"),
+        ),
     ];
     for (name, content) in items {
         write_marker_file(&commands.join(name), &content)?;
@@ -254,6 +316,43 @@ fn write_marker_file(path: &Path, content: &str) -> Result<()> {
         }
     }
     fs::write(path, content).with_context(|| format!("writing {}", path.display()))?;
+    Ok(())
+}
+
+#[derive(Default)]
+struct RestoreReport {
+    removed: usize,
+    kept: usize,
+    missing: usize,
+}
+
+fn restore_marker_file(path: &Path, report: &mut RestoreReport) -> Result<()> {
+    if !path.exists() {
+        report.missing += 1;
+        return Ok(());
+    }
+
+    let existing = fs::read_to_string(path).unwrap_or_default();
+    if existing.contains(MARKER) {
+        fs::remove_file(path).with_context(|| format!("removing {}", path.display()))?;
+        report.removed += 1;
+        println!("  {} removed {}", "ok".green(), path.display());
+    } else {
+        report.kept += 1;
+        println!("  {} kept non-marker file {}", "*".yellow(), path.display());
+    }
+    Ok(())
+}
+
+fn remove_empty_dir(path: &Path) -> Result<()> {
+    if path.exists() {
+        match fs::remove_dir(path) {
+            Ok(()) => {}
+            Err(err) if err.kind() == std::io::ErrorKind::DirectoryNotEmpty => {}
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+            Err(err) => return Err(err).with_context(|| format!("removing {}", path.display())),
+        }
+    }
     Ok(())
 }
 
@@ -285,12 +384,14 @@ setup from {surface}.
 ## Useful Commands
 
 - `kickbacks app` opens the dark desktop console.
+- `kickbacks doctor` verifies local data, integrations, skills, and trust boundaries.
 - `kickbacks sync status` shows account-ledger freshness versus local earning events.
 - `kickbacks trust` shows the bot-resistant trust ledger and advertiser proof contract.
 - `kickbacks install --all --yes` installs supported surfaces.
 - `kickbacks repair --all --yes` reapplies marker-owned integrations.
+- `kickbacks restore` removes marker-owned skills, plugin files, and slash commands.
 - `kickbacks hermes` launches Hermes TUI with Kickbacks installed.
-- Hermes TUI slash commands: `/kickbacks`, `/kickbacks-status`, `/kickbacks-repair`, `/kickbacks-dashboard`, `/kickbacks-sync`, `/kickbacks-trust`.
+- Hermes TUI slash commands: `/kickbacks`, `/kickbacks-status`, `/kickbacks-repair`, `/kickbacks-dashboard`, `/kickbacks-sync`, `/kickbacks-trust`, `/kickbacks-doctor`.
 
 ## Handoff
 
@@ -426,11 +527,19 @@ def _register_tools(ctx) -> None:
         schema=_schema("kickbacks_trust_engine", "Inspect Kickbacks two-way trust ledger."),
         handler=lambda args, **_kw: _json(_run(["trust", "--json"])),
     )
+    ctx.register_tool(
+        name="kickbacks_doctor",
+        toolset=TOOLSET,
+        description="Run the non-earning Kickbacks local doctor.",
+        emoji="stethoscope",
+        schema=_schema("kickbacks_doctor", "Run the non-earning Kickbacks local doctor."),
+        handler=lambda args, **_kw: _json(_run(["doctor"])),
+    )
 
 
 def _setup_cli(parser: argparse.ArgumentParser) -> None:
     sub = parser.add_subparsers(dest="command")
-    for name in ["status", "install", "repair", "dashboard", "sync", "trust"]:
+    for name in ["status", "install", "repair", "restore", "dashboard", "sync", "trust", "doctor"]:
         sub.add_parser(name)
 
 
@@ -440,9 +549,11 @@ def _handle_cli(args) -> None:
         "status": ["sync", "status"],
         "install": ["install", "--hermes", "--skills", "--yes"],
         "repair": ["repair", "--hermes", "--skills", "--yes"],
+        "restore": ["restore"],
         "dashboard": ["app"],
         "sync": ["sync", "status"],
         "trust": ["trust"],
+        "doctor": ["doctor"],
     }
     print(_json(_run(mapping[command])))
 
@@ -484,6 +595,38 @@ mod tests {
         assert!(HERMES_PLUGIN_PY.contains("ctx.register_cli_command"));
         assert!(HERMES_PLUGIN_PY.contains("kickbacks_account_sync"));
         assert!(HERMES_PLUGIN_PY.contains("kickbacks_trust_engine"));
+        assert!(HERMES_PLUGIN_PY.contains("kickbacks_doctor"));
         assert!(HERMES_PLUGIN_PY.contains("\"trust\": [\"trust\"]"));
+        assert!(HERMES_PLUGIN_PY.contains("\"restore\": [\"restore\"]"));
+    }
+
+    #[test]
+    fn restore_only_removes_marker_owned_files() {
+        let dir = std::env::temp_dir().join(format!(
+            "kb-install-restore-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&dir).unwrap();
+        let owned = dir.join("owned.md");
+        let foreign = dir.join("foreign.md");
+        let missing = dir.join("missing.md");
+        fs::write(&owned, format!("<!-- {MARKER} -->")).unwrap();
+        fs::write(&foreign, "user content").unwrap();
+
+        let mut report = RestoreReport::default();
+        restore_marker_file(&owned, &mut report).unwrap();
+        restore_marker_file(&foreign, &mut report).unwrap();
+        restore_marker_file(&missing, &mut report).unwrap();
+
+        assert!(!owned.exists());
+        assert!(foreign.exists());
+        assert_eq!(report.removed, 1);
+        assert_eq!(report.kept, 1);
+        assert_eq!(report.missing, 1);
+        fs::remove_dir_all(&dir).ok();
     }
 }
