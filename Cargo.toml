@@ -16,6 +16,10 @@ readme = "README.md"
 name = "kb"
 path = "src/main.rs"
 
+[[bin]]
+name = "kickbacks"
+path = "src/main.rs"
+
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
 serde = { version = "1.0", features = ["derive"] }

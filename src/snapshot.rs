@@ -131,8 +131,8 @@ mod tests {
     #[test]
     fn plain_snapshot_has_content_and_no_escapes() {
         let out = render_to_string(&demo_app(), 100, 30, false).unwrap();
-        assert!(out.contains("NOW PLAYING"));
-        assert!(out.contains("TOP ADVERTISERS"));
+        assert!(out.contains("LIVE CREATIVE"));
+        assert!(out.contains("ATTENTION OPS"));
         assert!(out.contains("demo data"));
         assert!(!out.contains('\x1b'));
     }
@@ -141,7 +141,7 @@ mod tests {
     fn colored_snapshot_uses_truecolor_escapes() {
         let out = render_to_string(&demo_app(), 100, 30, true).unwrap();
         assert!(out.contains("\x1b[38;2;"));
-        assert!(out.contains("NOW PLAYING"));
+        assert!(out.contains("LIVE CREATIVE"));
     }
 
     #[test]
@@ -165,6 +165,6 @@ mod tests {
         app.set_theme(crate::theme::Theme::Terminal);
         let out = render_to_string(&app, 100, 30, true).unwrap();
         assert!(!out.contains("\x1b[48;2;"));
-        assert!(out.contains("NOW PLAYING"));
+        assert!(out.contains("LIVE CREATIVE"));
     }
 }

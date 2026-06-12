@@ -8,7 +8,7 @@ use crossterm::style::{Color, Stylize};
 
 use crate::archive::Archive;
 use crate::sources::{self, AdStatus};
-use crate::{paths, util};
+use crate::{paths, sync_health, trust_engine, util};
 
 /// `cli-ad.json` freshness window, mirroring the extension.
 const FRESH_MS: i64 = 600_000;
@@ -72,6 +72,21 @@ pub fn run() -> Result<()> {
     row(
         "earnings",
         format!("{} (kb stays read-only)", crate::render::PORTFOLIO_URL),
+    );
+
+    let sync = sync_health::current(&archive)?;
+    row("sync", format!("{} - {}", sync.label, sync.message));
+
+    let trust = trust_engine::current(&archive)?;
+    row(
+        "trust",
+        format!(
+            "user {} / {}, surface {} / {}",
+            trust.user_risk_score,
+            trust.user_risk_band,
+            trust.surface_risk_score,
+            trust.surface_risk_band
+        ),
     );
 
     println!();

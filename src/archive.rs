@@ -7,6 +7,7 @@
 
 use anyhow::{Context, Result};
 use rusqlite::{params, Connection};
+use serde::Serialize;
 use std::path::Path;
 
 use crate::model::AdRow;
@@ -62,7 +63,7 @@ CREATE TABLE IF NOT EXISTS coverage (
 "#;
 
 /// Summary statistics rendered by `kb archive stats` and the dashboard.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize)]
 pub struct Stats {
     pub distinct_ads: i64,
     pub advertisers: i64,
@@ -74,11 +75,22 @@ pub struct Stats {
 }
 
 /// One advertiser leaderboard entry.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct AdvertiserStat {
     pub advertiser: String,
     pub distinct_ads: i64,
     pub sightings: i64,
+}
+
+/// One local ledger row: a recorded ad sighting joined to the creative.
+#[derive(Debug, Clone, Serialize)]
+pub struct LedgerEvent {
+    pub ad_id: String,
+    pub advertiser: String,
+    pub ad_text: String,
+    pub click_url: Option<String>,
+    pub seen_ms: i64,
+    pub observed_ms: i64,
 }
 
 /// Result of a single capture pass.
@@ -314,6 +326,31 @@ impl Archive {
         Ok(rows)
     }
 
+    /// Recent local ad sightings, newest first. These are local observations,
+    /// not account credits; the desktop app labels them accordingly.
+    pub fn recent_ledger(&self, limit: usize) -> Result<Vec<LedgerEvent>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT s.ad_id, a.advertiser, a.ad_text, a.click_url, s.seen_ms, s.observed_ms
+             FROM sightings s
+             JOIN ads a ON a.id = s.ad_id
+             ORDER BY s.observed_ms DESC
+             LIMIT ?1",
+        )?;
+        let rows = stmt
+            .query_map(params![limit as i64], |r| {
+                Ok(LedgerEvent {
+                    ad_id: r.get(0)?,
+                    advertiser: r.get(1)?,
+                    ad_text: r.get(2)?,
+                    click_url: r.get(3)?,
+                    seen_ms: r.get(4)?,
+                    observed_ms: r.get(5)?,
+                })
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(rows)
+    }
+
     /// Activity for the last `hours` clock hours, oldest first, ending with
     /// the hour containing `now_ms`. `Some(n)` means kb was observing during
     /// that hour and recorded `n` sightings; `None` means kb was not watching,
@@ -511,5 +548,16 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM coverage", [], |r| r.get(0))
             .unwrap();
         assert_eq!(n, 1);
+    }
+
+    #[test]
+    fn recent_ledger_joins_sightings_to_ads() {
+        let mut a = Archive::open_in_memory().unwrap();
+        a.capture_ad(&ad("Tailscale - VPN", "https://tailscale.com/", 1), 10)
+            .unwrap();
+        let rows = a.recent_ledger(5).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].advertiser, "Tailscale");
+        assert_eq!(rows[0].observed_ms, 10);
     }
 }

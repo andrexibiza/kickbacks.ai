@@ -275,7 +275,7 @@ fn brand_title(pal: &Palette, demo: bool) -> Line<'static> {
     let mut spans = vec![
         Span::styled(" kickbacks", fg(pal.gold).add_modifier(Modifier::BOLD)),
         Span::styled("-kit ", fg(pal.fg).add_modifier(Modifier::BOLD)),
-        Span::styled("· kbtop ", fg(pal.dim)),
+        Span::styled("· attention console ", fg(pal.dim)),
     ];
     if demo {
         spans.push(Span::styled(
@@ -324,21 +324,21 @@ fn keybinds_line(pal: &Palette, theme: Theme, chart: ChartStyle) -> Line<'static
 
 fn ethic_line(pal: &Palette) -> Line<'static> {
     Line::from(Span::styled(
-        " read-only · observes, never bills ",
+        " local archive · cloud earnings stay on Kickbacks.ai ",
         fg(pal.dim).add_modifier(Modifier::ITALIC),
     ))
 }
 
 fn render_left(frame: &mut Frame, area: Rect, app: &App) {
-    let rows = Layout::vertical([Constraint::Length(7), Constraint::Min(0)]).split(area);
+    let rows = Layout::vertical([Constraint::Length(8), Constraint::Min(0)]).split(area);
     render_now_playing(frame, rows[0], app);
     render_totals(frame, rows[1], app);
 }
 
 fn render_right(frame: &mut Frame, area: Rect, app: &App) {
     let rows = Layout::vertical([
-        Constraint::Length(7),
-        Constraint::Length(11),
+        Constraint::Length(8),
+        Constraint::Length(12),
         Constraint::Min(0),
     ])
     .split(area);
@@ -360,7 +360,7 @@ fn section(frame: &mut Frame, area: Rect, pal: &Palette, label: &str) -> Rect {
 
 fn render_now_playing(frame: &mut Frame, area: Rect, app: &App) {
     let pal = &app.palette;
-    let body = section(frame, area, pal, "NOW PLAYING");
+    let body = section(frame, area, pal, "LIVE CREATIVE");
     let fresh = app
         .current
         .as_ref()
@@ -392,15 +392,19 @@ fn render_now_playing(frame: &mut Frame, area: Rect, app: &App) {
                 .unwrap_or_default();
             let age = util::human_age(app.now_ms - ad.ts);
             vec![
-                Line::from(Span::styled(
-                    advertiser,
-                    fg(pal.gold).add_modifier(Modifier::BOLD),
-                )),
+                Line::from(vec![
+                    Span::styled("in rotation  ", fg(pal.dim)),
+                    Span::styled(advertiser, fg(pal.gold).add_modifier(Modifier::BOLD)),
+                ]),
                 Line::from(Span::styled(
                     util::truncate(&tagline, area.width.saturating_sub(2) as usize),
                     fg(pal.fg),
                 )),
-                Line::from(Span::styled(format!("{host} · {age}"), fg(pal.dim))),
+                Line::from(vec![
+                    Span::styled("landing  ", fg(pal.dim)),
+                    Span::styled(host, fg(pal.teal)),
+                ]),
+                Line::from(Span::styled(format!("fresh {age} ago"), fg(pal.dim))),
             ]
         }
         _ => vec![
@@ -420,20 +424,44 @@ fn render_now_playing(frame: &mut Frame, area: Rect, app: &App) {
 
 fn render_totals(frame: &mut Frame, area: Rect, app: &App) {
     let pal = &app.palette;
-    let body = section(frame, area, pal, "TOTALS");
+    let body = section(frame, area, pal, "ATTENTION OPS");
     let s = &app.stats;
-    let span = |label: &'static str, value: String| {
-        Line::from(vec![
-            Span::styled(format!("{label:<12}"), fg(pal.dim)),
-            Span::styled(value, fg(pal.teal).add_modifier(Modifier::BOLD)),
-        ])
-    };
+    let observed = observed_hours(&app.sparkline);
+    let expected = app.sparkline.len().max(24);
+    let streak = active_streak_hours(&app.sparkline);
     let mut lines = vec![
-        span("ads seen", s.distinct_ads.to_string()),
-        span("advertisers", s.advertisers.to_string()),
-        span("sightings", s.total_sightings.to_string()),
-        span("today", s.sightings_today.to_string()),
-        span("this week", s.sightings_week.to_string()),
+        metric_pair(
+            pal,
+            body.width,
+            "ads seen",
+            s.distinct_ads.to_string(),
+            "advertisers",
+            s.advertisers.to_string(),
+        ),
+        metric_pair(
+            pal,
+            body.width,
+            "sightings",
+            s.total_sightings.to_string(),
+            "repeat rate",
+            repeat_rate(s),
+        ),
+        metric_pair(
+            pal,
+            body.width,
+            "today",
+            s.sightings_today.to_string(),
+            "this week",
+            s.sightings_week.to_string(),
+        ),
+        metric_pair(
+            pal,
+            body.width,
+            "coverage",
+            format!("{observed}/{expected}h"),
+            "live streak",
+            format!("{streak}h"),
+        ),
     ];
     if let Some(first) = s.first_seen_ms {
         lines.push(Line::from(Span::styled(
@@ -441,11 +469,23 @@ fn render_totals(frame: &mut Frame, area: Rect, app: &App) {
             fg(pal.dim).add_modifier(Modifier::ITALIC),
         )));
     }
+    if let Some(last) = s.last_seen_ms {
+        lines.push(Line::from(Span::styled(
+            format!("last capture {} ago", util::human_age(app.now_ms - last)),
+            fg(pal.dim).add_modifier(Modifier::ITALIC),
+        )));
+    }
     // Earnings deliberately live off-screen: kb never reads balances (that
     // needs the cloud backend). Point the user to the real number instead of
     // inventing one.
     lines.push(Line::from(""));
-    lines.push(Line::from(Span::styled("$ earnings", fg(pal.dim))));
+    lines.push(Line::from(vec![
+        Span::styled("earnings cockpit  ", fg(pal.dim)),
+        Span::styled(
+            "open Kickbacks.ai",
+            fg(pal.gold).add_modifier(Modifier::BOLD),
+        ),
+    ]));
     lines.push(Line::from(Span::styled(PORTFOLIO_URL, fg(pal.gold))));
     lines.push(Line::from(Span::styled(
         "read-only · kb does not read balances",
@@ -454,9 +494,83 @@ fn render_totals(frame: &mut Frame, area: Rect, app: &App) {
     frame.render_widget(Paragraph::new(lines), body);
 }
 
+fn metric_pair(
+    pal: &Palette,
+    width: u16,
+    left_label: &'static str,
+    left_value: String,
+    right_label: &'static str,
+    right_value: String,
+) -> Line<'static> {
+    let col_w = ((width as usize).saturating_sub(2) / 2).max(16);
+    let label_w = col_w.saturating_sub(7).max(8);
+    Line::from(vec![
+        Span::styled(format!("{left_label:<label_w$}"), fg(pal.dim)),
+        Span::styled(
+            format!("{left_value:<6}"),
+            fg(pal.teal).add_modifier(Modifier::BOLD),
+        ),
+        Span::raw("  "),
+        Span::styled(format!("{right_label:<label_w$}"), fg(pal.dim)),
+        Span::styled(right_value, fg(pal.gold).add_modifier(Modifier::BOLD)),
+    ])
+}
+
+fn observed_hours(data: &[Option<u64>]) -> usize {
+    data.iter().filter(|hour| hour.is_some()).count()
+}
+
+fn active_streak_hours(data: &[Option<u64>]) -> usize {
+    data.iter().rev().take_while(|hour| hour.is_some()).count()
+}
+
+fn repeat_rate(s: &Stats) -> String {
+    if s.distinct_ads <= 0 {
+        return "0.0x".to_string();
+    }
+    format!("{:.1}x", s.total_sightings as f64 / s.distinct_ads as f64)
+}
+
+fn percent(part: i64, total: i64) -> String {
+    if total <= 0 {
+        return "0%".to_string();
+    }
+    format!(
+        "{:.0}%",
+        (part as f64 / total as f64 * 100.0).clamp(0.0, 999.0)
+    )
+}
+
+fn mini_bar(value: i64, max: i64, width: usize) -> String {
+    if width == 0 {
+        return String::new();
+    }
+    let filled = if max <= 0 {
+        0
+    } else {
+        ((value.max(0) as f64 / max as f64) * width as f64).ceil() as usize
+    }
+    .clamp(0, width);
+    format!("{}{}", "█".repeat(filled), "░".repeat(width - filled))
+}
+
+fn activity_summary(data: &[Option<u64>], pal: &Palette) -> Line<'static> {
+    let observed = observed_hours(data);
+    let total: u64 = data.iter().filter_map(|v| *v).sum();
+    let peak = data.iter().filter_map(|v| *v).max().unwrap_or(0);
+    Line::from(vec![
+        Span::styled("total ", fg(pal.dim)),
+        Span::styled(total.to_string(), fg(pal.gold).add_modifier(Modifier::BOLD)),
+        Span::styled("  peak ", fg(pal.dim)),
+        Span::styled(peak.to_string(), fg(pal.teal).add_modifier(Modifier::BOLD)),
+        Span::styled("  observed ", fg(pal.dim)),
+        Span::styled(format!("{observed}/{}h", data.len().max(24)), fg(pal.dim)),
+    ])
+}
+
 fn render_sparkline(frame: &mut Frame, area: Rect, app: &App) {
     let pal = &app.palette;
-    let body = section(frame, area, pal, "SIGHTINGS · LAST 24H");
+    let body = section(frame, area, pal, "ATTENTION STREAM · LAST 24H");
     if app.sparkline.iter().all(Option::is_none) {
         let hint = Paragraph::new(Line::from(Span::styled(
             "not watching — run kb watch or keep kb top open",
@@ -467,7 +581,11 @@ fn render_sparkline(frame: &mut Frame, area: Rect, app: &App) {
     }
     match app.chart_style {
         ChartStyle::Heat => {
-            frame.render_widget(Paragraph::new(heat_strip(&app.sparkline, body, pal)), body);
+            let mut lines = heat_strip(&app.sparkline, body, pal);
+            if (body.height as usize) > lines.len() {
+                lines.push(activity_summary(&app.sparkline, pal));
+            }
+            frame.render_widget(Paragraph::new(lines), body);
         }
         ChartStyle::Bars => render_bars(frame, body, &app.sparkline, pal),
     }
@@ -664,19 +782,31 @@ fn heat_legend(width: u16, pal: &Palette) -> Line<'static> {
 
 fn render_leaderboard(frame: &mut Frame, area: Rect, app: &App) {
     let pal = &app.palette;
-    let body = section(frame, area, pal, "TOP ADVERTISERS");
+    let body = section(frame, area, pal, "MARKET PULSE");
     if app.leaderboard.is_empty() {
         frame.render_widget(empty_hint(pal), body);
         return;
     }
-    let name_w = body.width.saturating_sub(14) as usize;
+    let max_seen = app
+        .leaderboard
+        .iter()
+        .map(|a| a.sightings)
+        .max()
+        .unwrap_or(1);
+    let name_w = body.width.saturating_sub(27) as usize;
     let rows = app.leaderboard.iter().enumerate().map(|(i, a)| {
+        let share = percent(a.sightings, app.stats.total_sightings);
         Row::new(vec![
             Cell::from(Span::styled(format!("{:>2}", i + 1), fg(pal.dim))),
             Cell::from(Span::styled(
                 util::truncate(&a.advertiser, name_w),
                 fg(pal.fg),
             )),
+            Cell::from(Span::styled(
+                mini_bar(a.sightings, max_seen, 8),
+                fg(pal.gold),
+            )),
+            Cell::from(Span::styled(share, fg(pal.teal))),
             Cell::from(Span::styled(a.distinct_ads.to_string(), fg(pal.dim))),
             Cell::from(Span::styled(
                 a.sightings.to_string(),
@@ -687,12 +817,16 @@ fn render_leaderboard(frame: &mut Frame, area: Rect, app: &App) {
     let header = Row::new(vec![
         Cell::from(""),
         Cell::from(Span::styled("advertiser", fg(pal.dim))),
+        Cell::from(Span::styled("heat", fg(pal.dim))),
+        Cell::from(Span::styled("share", fg(pal.dim))),
         Cell::from(Span::styled("ads", fg(pal.dim))),
         Cell::from(Span::styled("seen", fg(pal.dim))),
     ]);
     let widths = [
         Constraint::Length(3),
         Constraint::Min(8),
+        Constraint::Length(8),
+        Constraint::Length(6),
         Constraint::Length(4),
         Constraint::Length(5),
     ];
@@ -712,13 +846,40 @@ fn render_recent(frame: &mut Frame, area: Rect, app: &App) {
         .recent
         .iter()
         .map(|ad| {
+            let host = ad
+                .click_url
+                .as_deref()
+                .and_then(host_of)
+                .unwrap_or_else(|| "direct".to_string());
+            let age = util::human_age(app.now_ms - ad.last_seen_ms);
+            let meta = format!("{}x · {} · {}", ad.times_seen, host, age);
+            let tagline_w = width.saturating_sub(meta.len()).saturating_sub(4);
             Line::from(vec![
                 Span::styled("· ", fg(pal.gold)),
-                Span::styled(util::truncate(&ad.ad_text, width), fg(pal.fg)),
+                Span::styled(
+                    util::truncate(&ad.advertiser, 14),
+                    fg(pal.gold).add_modifier(Modifier::BOLD),
+                ),
+                Span::styled("  ", fg(pal.dim)),
+                Span::styled(util::truncate(&ad_row_tagline(ad), tagline_w), fg(pal.fg)),
+                Span::styled("  ", fg(pal.dim)),
+                Span::styled(meta, fg(pal.dim)),
             ])
         })
         .collect();
     frame.render_widget(Paragraph::new(lines), body);
+}
+
+fn ad_row_tagline(ad: &AdRow) -> String {
+    for sep in [" · ", " — ", " - ", ": "] {
+        if let Some((_, rest)) = ad.ad_text.split_once(sep) {
+            let rest = rest.trim();
+            if !rest.is_empty() {
+                return rest.to_string();
+            }
+        }
+    }
+    ad.ad_text.clone()
 }
 
 fn empty_hint(pal: &Palette) -> Paragraph<'static> {
@@ -827,7 +988,7 @@ mod tests {
         let app = App::default();
         let out = rendered(&app);
         assert!(out.contains("kickbacks"));
-        assert!(out.contains("NOW PLAYING"));
+        assert!(out.contains("LIVE CREATIVE"));
         assert!(out.contains("no ad right now"));
     }
 
@@ -875,7 +1036,7 @@ mod tests {
         };
         let out = rendered(&app);
         assert!(out.contains("Tailscale"));
-        assert!(out.contains("TOP ADVERTISERS"));
+        assert!(out.contains("ATTENTION OPS"));
         assert!(out.contains("signed in"));
     }
 
@@ -946,7 +1107,7 @@ mod tests {
         let out = rendered(&demo_app());
         assert!(out.contains("Tailscale"));
         assert!(out.contains("demo data"));
-        assert!(out.contains("TOP ADVERTISERS"));
+        assert!(out.contains("ATTENTION OPS"));
     }
 
     #[test]
@@ -1029,7 +1190,7 @@ mod tests {
                     theme,
                     style
                 );
-                assert!(out.contains("TOP ADVERTISERS"));
+                assert!(out.contains("ATTENTION OPS"));
             }
         }
     }

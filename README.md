@@ -10,7 +10,7 @@ a local ad archive plus a Rust TUI dashboard for ad sightings, advertisers, and 
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Built with Rust](https://img.shields.io/badge/built%20with-Rust-orange.svg)](https://www.rust-lang.org/)
-[![Tests](https://img.shields.io/badge/tests-84%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-97%20passing-brightgreen.svg)](#testing)
 [![Read only](https://img.shields.io/badge/read--only-never%20bills-success.svg)](#what-this-is-and-is-not)
 
 <img src="media/kbtop.svg" alt="kickbacks-kit kbtop terminal dashboard for kickbacks.ai showing the current ad, total ads seen, a 24 hour sightings sparkline, the advertiser leaderboard, and recent ads in Claude Code" width="820">
@@ -26,6 +26,12 @@ ad lives in one file, and earnings sit in memory until the next API poll.
 `kickbacks-kit` keeps the history the extension discards. It watches the local
 files the extension already writes, records every ad into a small SQLite archive,
 and renders the whole picture in a terminal UI. Nothing leaves your machine.
+
+This branch also prototypes the next product layer: a dark desktop trust console
+for ledger freshness, installs, payout readiness, and bot-resistant earning
+integrity.
+The core pitch is simple: Kickbacks needs to pay real users without letting bots
+drain advertisers.
 
 > The dashboard above shows sample data, for the screenshot. Your real numbers
 > fill in as you code with the extension running.
@@ -46,6 +52,12 @@ The advertisers pay for real attention, and the split to you rests on that. This
 project records your history. It does not manufacture it. If you want more (and
 better) ads, the honest lever is to do real work with the extension running.
 
+The desktop app and Trust Engine keep that same line. They can read local
+activity, account-ledger freshness, install state, Stripe readiness, and
+backend-provided trust summaries. They must not post metrics, retry earning
+events, hold Stripe secrets, create charges, or turn repair tests into payable
+activity.
+
 `kickbacks-kit` is an independent community tool. It is not affiliated with
 kickbacks.ai or ShiftKeys, Inc.
 
@@ -63,7 +75,7 @@ Or clone and build:
 git clone https://github.com/OthmanAdi/kickbacks-kit
 cd kickbacks-kit
 cargo build --release
-# binary at target/release/kb
+# binaries at target/release/kb and target/release/kickbacks
 ```
 
 ## Quickstart
@@ -72,6 +84,9 @@ cargo build --release
 kb setup      # create the archive and capture once
 kb status     # are ads flowing right now, and if not, why
 kb doctor     # confirm the extension files and archive are wired up
+kb app        # dark local desktop console and API
+kb sync status
+kb trust      # two-way trust ledger for users and advertisers
 kb top        # live dashboard (also captures while open)
 kb snapshot   # one-shot dashboard render to stdout
 kb watch      # headless capture in a spare terminal
@@ -100,6 +115,58 @@ live version. If the kickbacks extension already owns the status line, the
 installer wraps it rather than replacing it, and keeps a backup. Undo everything
 with `kb uninstall-claude`.
 
+## Desktop trust console
+
+`kb app` starts a local dark-mode-only product console at `http://127.0.0.1:38241`.
+It is designed as the real Kickbacks desktop surface, not a landing page:
+
+* ledger freshness monitor for local metric sends versus the last known account
+  ledger, without implying Stripe failure from a stale visible watermark alone,
+* Trust Engine for user risk, surface risk, suspicious queues, payout holds, cap
+  reasons, earning eligibility states, and advertiser proof,
+* install status for VS Code, Claude Code CLI, Codex CLI, Hermes Agent/TUI, and
+  skill packs,
+* Stripe Connect readiness as a backend-owned contract,
+* local archive, advertiser pulse, recent ledger, and founder-facing developer note.
+
+The Trust Engine is a two-way ledger. Developers see whether their real activity
+is syncing. Advertisers get the model for proof that ads were actually seen:
+eligible, capped, visible-but-non-billable, held for review, rejected, fraudulent,
+refunded, and bot-filtered buckets.
+
+The advertiser proof layer is intentionally auditable. It separates gross adapter
+events, held events, rejected or fraudulent events, refunded events, final
+billable reach, and payouts released after the trust window. Those numbers should
+come from explicit ledgers: event classification, adapter attestation, fraud
+clusters, advertiser refunds, and payout holds.
+
+Local evidence is intentionally limited. Cluster detection for same IP/ASN/device,
+identical install fingerprints, account age, Stripe/KYC status, refund exposure,
+and payout finality requires backend data. The app labels those as backend-owned
+instead of inventing certainty.
+
+See [TRUST_ENGINE.md](TRUST_ENGINE.md) for the trust-boundary state machine,
+settlement gates, advertiser assurance report, and Stripe payout boundary.
+
+## Plug-and-play integrations
+
+The `kickbacks` binary is an alias for the same tool as `kb`, with app-facing
+commands for a desktop product install:
+
+```bash
+kickbacks install --all --yes
+kickbacks repair --all --yes
+kickbacks restore
+kickbacks claude
+kickbacks codex
+kickbacks hermes
+```
+
+`kickbacks install` can install or repair marker-owned integrations for VS Code,
+Claude Code CLI commands/status line, Codex and Hermes skills, and the Hermes
+plugin. Installer, repair, doctor, skills, dashboard, and Trust Engine flows are
+non-earning probe mode: they validate setup without creating payable events.
+
 ## Commands
 
 | Command | What it does |
@@ -108,6 +175,12 @@ with `kb uninstall-claude`.
 | `kb snapshot [--width N] [--plain] [--theme T] [--chart-style C]` | One-shot dashboard render to stdout. Same view as `kb top`. |
 | `kb statusline [--width N] [--plain]` | One status-bar line: the current ad plus your kb stats. |
 | `kb status` | Whether ads are flowing now, and why not (killswitch, idle, signed out). |
+| `kb app [--port N] [--no-open]` | Local dark desktop trust console and JSON API. |
+| `kb sync status` | Ledger freshness monitor for local metric sends versus account ledger watermark. |
+| `kb sync mark --at TIME` | Record the last known account ledger sync time. |
+| `kb trust [--json]` | Two-way Trust Engine: eligibility states, caps, holds, advertiser proof, bot-risk contract. |
+| `kb install --all --yes` / `kb repair --all --yes` | Plug-and-play installer/repair for supported surfaces and skills. |
+| `kb claude` / `kb codex` / `kb hermes` | Launch agent CLIs through Kickbacks wrappers. |
 | `kb watch [--interval N] [--once]` | Headless capture loop. Default poll is 3 seconds. |
 | `kb archive stats` | Summary: ads seen, advertisers, sightings, today, this week. |
 | `kb archive list [--limit N]` | Captured ads, most recent first. |
@@ -236,8 +309,10 @@ on. Earnings stay where they belong, on your [portfolio](https://kickbacks.ai/me
 ## Testing
 
 ```bash
+cargo fmt --all -- --check
 cargo test       # unit tests plus TUI render snapshots
 cargo clippy --all-targets -- -D warnings
+cargo build --release
 ```
 
 ## Contributing

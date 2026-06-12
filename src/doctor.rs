@@ -5,7 +5,7 @@ use anyhow::Result;
 use crossterm::style::Stylize;
 
 use crate::archive::Archive;
-use crate::{paths, sources, util};
+use crate::{paths, sources, sync_health, trust_engine, util};
 
 /// How fresh `cli-ad.json` must be to count as a live ad (matches the
 /// extension's own 10-minute freshness window).
@@ -74,6 +74,31 @@ pub fn run() -> Result<()> {
             stats.distinct_ads,
             stats.total_sightings,
             db.display()
+        ),
+    );
+
+    let sync = sync_health::current(&archive)?;
+    check(
+        "ledger freshness monitor",
+        matches!(
+            sync.severity,
+            sync_health::SyncSeverity::Ok
+                | sync_health::SyncSeverity::Monitoring
+                | sync_health::SyncSeverity::Warning
+        ),
+        &sync.message,
+    );
+
+    let trust = trust_engine::current(&archive)?;
+    check(
+        "trust engine",
+        trust.user_risk_score < 75 && trust.surface_risk_score < 75,
+        &format!(
+            "user {} / {}, surface {} / {}",
+            trust.user_risk_score,
+            trust.user_risk_band,
+            trust.surface_risk_score,
+            trust.surface_risk_band
         ),
     );
 
