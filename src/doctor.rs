@@ -52,7 +52,7 @@ pub fn run() -> Result<()> {
     let state = sources::read_live_state()?;
     let signed = state.signed_in.unwrap_or(false);
     check(
-        "signed in to kickbacks",
+        "signed in to Kickback.ai",
         signed,
         if signed { "yes" } else { SIGNED_OUT_DETAIL },
     );

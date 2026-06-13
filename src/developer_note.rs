@@ -48,7 +48,7 @@ pub fn note() -> DeveloperNote {
             "Every earning surface, including CLI/TUI, desktop, Telegram, Discord, and agent workflow surfaces, runs as a registered official opt-in adapter; no official adapter signature means no earning candidate.",
             "Adapter events carry surface ID, adapter ID/version, user/session ID, campaign/creative ID, render timestamp, wait-state proof, threshold timestamp, cap context, and backend nonce or signed receipt.",
             "The backend Trust Engine ingests candidates into an append-only event classification ledger.",
-            "Only backend ledgers can move events into accepted, billable, payable, refunded, or rejected states; local logs and desktop state prove visibility, not money.",
+            "Only backend ledgers can move events into backend_accepted, accepted_billable_after_refund_window, paid, refunded, rejected, or fraudulent states; local logs and desktop state prove visibility, not money.",
             "Advertiser assurance reads from separate ledgers: gross adapter events, attestation, fraud clusters, refunds, payout holds, and final billable reach.",
             "Stripe Connect is the payout rail downstream of trust gates, refund windows, KYC/1099 status, and payout finality.",
         ],
