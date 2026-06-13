@@ -14,7 +14,6 @@ use crate::{developer_note, integrations, paths, sync_health, trust_engine, util
 
 pub const DEFAULT_PORT: u16 = 38241;
 const FIGMA_CAPTURE_SCRIPT: &str = "https://mcp.figma.com/mcp/html-to-design/capture.js";
-const FIGMA_CAPTURE_ALLOWED_IN_THIS_BUILD: bool = cfg!(debug_assertions);
 const FIGMA_CAPTURE_ENV: &str = "KICKBACKS_APP_FIGMA_CAPTURE";
 const APP_DEV_ENV: &str = "KICKBACKS_APP_DEV";
 const APP_ENV: &str = "KICKBACKS_APP_ENV";
@@ -220,8 +219,7 @@ fn dashboard_html(capture_enabled: bool) -> String {
 }
 
 fn figma_capture_enabled() -> bool {
-    FIGMA_CAPTURE_ALLOWED_IN_THIS_BUILD
-        && env_flag_enabled(FIGMA_CAPTURE_ENV)
+    env_flag_enabled(FIGMA_CAPTURE_ENV)
         && (env_flag_enabled(APP_DEV_ENV)
             || std::env::var(APP_ENV)
                 .map(|value| {
