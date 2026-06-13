@@ -96,7 +96,7 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Notes
 * Reading live earnings over the extension's loopback was evaluated and dropped:
   the local endpoint exposes only the log tail (no balance), and a real balance
-  needs the kickbacks.ai cloud backend, which the read-only invariant keeps out
+  needs the Kickback.ai cloud backend, which the read-only invariant keeps out
   of scope.
 
 ## [0.1.3]
@@ -105,9 +105,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 * `kb status`: an honest, local read of whether ads are flowing now, and why not
   (killswitch, idle, signed out, injection off), plus the current ad, Claude Code
   and extension versions, and archive totals.
-* `kb top` shows a red "ADS PAUSED" banner when the kickbacks.ai killswitch is
+* `kb top` shows a red "ADS PAUSED" banner when the Kickback.ai killswitch is
   active, and `kb doctor` gained an "ads status" line.
-* Documented that kickbacks.ai has no status page; the maintainer posts outages
+* Documented that Kickback.ai has no status page; the maintainer posts outages
   on X (@andrewmccalip).
 
 ## [0.1.2]

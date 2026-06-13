@@ -4,7 +4,7 @@ Thanks for your interest in kickbacks-kit. Issues and pull requests are welcome.
 
 ## Ground rule
 
-This project is read-only by design. It observes the local files the kickbacks.ai
+This project is read-only by design. It observes the local files the Kickback.ai
 extension writes, and it never emits a billing event or contacts the backend. Any
 change that would post an impression, a view, a click, or otherwise inflate credit
 is out of scope and will not be merged. Keeping that line clean is the whole point.

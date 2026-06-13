@@ -15,18 +15,19 @@ older local archive/TUI companion moved underneath the product pitch.
 [![Built with Rust](https://img.shields.io/badge/built%20with-Rust-orange.svg)](https://www.rust-lang.org/)
 [![Boundary](https://img.shields.io/badge/earning%20boundary-opt--in%20adapters-success.svg)](#safety-boundary)
 
-<img src="media/kbtop.svg" alt="kickbacks-kit kbtop terminal dashboard for kickbacks.ai showing the current ad, total ads seen, a 24 hour sightings sparkline, the advertiser leaderboard, and recent ads in Claude Code" width="820">
+<img src="media/kbtop.svg" alt="kickbacks-kit kbtop terminal dashboard for Kickback.ai showing the current ad, total ads seen, a 24 hour sightings sparkline, the advertiser leaderboard, and recent ads in Claude Code" width="820">
 
 </div>
 
 ---
 
-Kickback.ai already has the important first move: sponsored messages appear
-inside developer workflows and the revenue is shared with real users. Phase 0 is
-about making that feel trustworthy before it feels large. Developers need to see
-whether their local surfaces are installed and syncing. Advertisers need proof
-that bot pressure, probe traffic, caps, refunds, holds, reversals, and payout
-release are separated in ledgers instead of blurred into one impression count.
+Kickback.ai has the important first product promise: developer attention inside
+real workflows can become valuable only when it is explicit, trusted, and
+auditable. Phase 0 is about making that promise feel trustworthy before it feels
+large. Developers need to see whether their local surfaces are installed and
+syncing. Advertisers need proof that bot pressure, probe traffic, caps, refunds,
+holds, reversals, and payout release are separated in ledgers instead of blurred
+into one impression count.
 
 `kickbacks-kit` is the local command center for that MVP:
 
@@ -419,7 +420,7 @@ extension keeps running but no ads show, which can look like a local breakage.
 `kb status` reads the extension's own last reported state and says so plainly:
 
 ```text
-ads  PAUSED (kickbacks killswitch active)
+ads  PAUSED (Kickback.ai killswitch active)
 ```
 
 `kb top` shows the same state as an "ADS PAUSED" banner. The state comes from
@@ -474,7 +475,7 @@ repository has shipped backend settlement features.
 | :---- | :---- |
 | 0 | Local desktop control plane, installer/repair, Hermes/Claude/Codex skills, Trust Engine report, sync freshness, developer note, and local archive/TUI companion. |
 | 1 | Official adapter receipts for every earning surface, with signed candidate events, server-issued single-use nonces, session binding, and nonce replay rejection. |
-| 2 | Append-only event classification ledgers for accepted, held, capped, rejected, refunded, fraudulent, payable, paid, and final billable states. |
+| 2 | Append-only event classification ledgers for `probe`, `observed_local`, `candidate_adapter_attested`, `held_for_review`, `eligible_but_capped`, `backend_accepted`, `accepted_billable_after_refund_window`, `paid`, `refunded`, `rejected`, and `fraudulent` states. |
 | 3 | Advertiser assurance reports that separate gross events, held events, rejected or fraudulent events, refunds, final billable reach, and payout-released counts. |
 | 4 | Stripe Connect readiness and payout holds as backend-owned state displayed locally only when the backend provides it. |
 | 5 | Trust Engine operations: deterministic policy, manual review queues, fraud-cluster evidence, aggregate account checks, duty-cycle heuristics, strict concurrency limits, cap arithmetic, refund windows, and reversal workflows. |

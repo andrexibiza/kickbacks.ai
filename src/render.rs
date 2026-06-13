@@ -30,7 +30,7 @@ const FRESH_MS: i64 = 600_000;
 const HOUR_MS: i64 = 60 * 60 * 1000;
 
 /// Where real earnings live. kb stays read-only and offline, so it points here
-/// rather than reading balances (that needs the kickbacks.ai cloud backend,
+/// rather than reading balances (that needs the Kickback.ai cloud backend,
 /// which the honesty invariant keeps out of scope).
 pub const PORTFOLIO_URL: &str = "https://kickbacks.ai/me";
 
@@ -374,7 +374,7 @@ fn render_now_playing(frame: &mut Frame, area: Rect, app: &App) {
                 "● ADS PAUSED",
                 fg(pal.red).add_modifier(Modifier::BOLD),
             )),
-            Line::from(Span::styled("kickbacks killswitch active", fg(pal.red))),
+            Line::from(Span::styled("Kickback.ai killswitch active", fg(pal.red))),
             Line::from(Span::styled("server-side, not you", fg(pal.dim))),
         ];
         frame.render_widget(Paragraph::new(lines), body);

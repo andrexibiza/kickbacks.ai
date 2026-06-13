@@ -1,4 +1,4 @@
-//! Readers for the kickbacks.ai extension's local artifacts.
+//! Readers for the Kickback.ai extension's local artifacts.
 //!
 //! These readers are intentionally read-only. They never write to files the
 //! extension owns and never emit a network request to a billing endpoint. They
@@ -154,7 +154,7 @@ pub struct LiveState {
 pub enum AdStatus {
     /// Not signed in, so nothing accrues.
     SignedOut,
-    /// kickbacks.ai killswitch is active (server-side pause).
+    /// Kickback.ai killswitch is active (server-side pause).
     Paused,
     /// Ad injection is switched off locally.
     InjectionOff,
@@ -169,7 +169,7 @@ impl AdStatus {
     pub fn label(self) -> &'static str {
         match self {
             AdStatus::SignedOut => "SIGNED OUT",
-            AdStatus::Paused => "PAUSED (kickbacks killswitch active)",
+            AdStatus::Paused => "PAUSED (Kickback.ai killswitch active)",
             AdStatus::InjectionOff => "OFF (ad injection disabled)",
             AdStatus::Live => "LIVE (ad showing now)",
             AdStatus::Idle => "IDLE (no active Claude Code session)",
