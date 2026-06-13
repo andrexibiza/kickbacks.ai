@@ -1,9 +1,10 @@
 # Security Policy
 
 Kickback.ai must keep the earning boundary boring and explicit. Desktop,
-CLI/TUI, Telegram, Discord, chat, and agent workflow surfaces are already
-monetized developer-attention surfaces in Axl's system when they run as
-registered official opt-in earning adapters.
+CLI/TUI, Telegram, Discord, chat, and agent workflow surfaces may become earning
+inventory only when they run as registered official opt-in earning adapters with
+explicit user controls, proof, backend acceptance, refund windows, and
+settlement gates.
 
 The shipped Phase 0 control surfaces help a user see, diagnose, install, and
 repair their setup. They do not self-settle billable or payable events. No
@@ -27,6 +28,13 @@ Phase 0 documentation and UI should assume these abuse paths are realistic:
 
 - replayed extension files, duplicated metrics, or stale ledger watermarks
   presented as fresh backend truth;
+- loopback or VS Code-readable tokens used as bearer material to forge ad
+  revenue;
+- proof-of-concept saturation scripts, including `attack-real.mjs`-style
+  realistic traffic generators, that mimic variable cadence, positive jitter,
+  irregular durations, alternating surfaces, continuous caps, and rest cycles;
+- brittle client-side anchors in third-party webviews that break or drift after
+  upstream bundle changes;
 - official adapter controls bypassed, hidden, or presented as mandatory;
 - account farms, bot farms, shared device fingerprints, risky IP/ASN clusters,
   and parallel-agent traffic;
@@ -38,8 +46,44 @@ Phase 0 documentation and UI should assume these abuse paths are realistic:
 
 The control strategy is conservative: local tools explain and display evidence,
 official opt-in adapters create candidate events, and backend ledgers decide
-what becomes accepted, billable, payable, credited, refunded, rejected, held, or
-reversed.
+what becomes accepted, billable, payable, refunded, rejected, held, fraudulent,
+or paid.
+
+## Loopback Token, Saturation, And Anchor Immunity
+
+Loopback tokens and locally readable developer-tool tokens are not attention
+proof. A token visible to VS Code, a local API client, or a diagnostic tool can
+prove only that a local process had bearer material. It cannot prove a real
+developer, visible creative, fresh session, advertiser-safe event, or payable
+earning.
+
+Every candidate earning event must survive five independent controls:
+
+1. a signed official adapter receipt with adapter ID/version, key ID, session
+   binding, user opt-in, visibility proof, and a compatibility manifest;
+2. a server-issued single-use nonce with a short TTL, backend challenge/receipt
+   pairing, duplicate rejection, and an idempotency key;
+3. aggregate account-level checks for campaign caps, duty cycle, strict
+   concurrency, surface alternation entropy, jitter and duration distributions,
+   rest windows, and account/device/IP/ASN graph clusters;
+4. human-in-the-loop ML scoring that emits reason codes such as
+   `loopback_token_replay`, `server_nonce_reused`,
+   `saturation_cadence_similarity`, `strict_concurrency_exceeded`, and
+   `adapter_anchor_incompatible`;
+5. backend billing, refund, hold, reversal, and payout ledgers that keep
+   advertiser billable reach separate from developer payout release.
+
+A leaked loopback token, missing nonce, expired nonce, reused nonce, unsigned
+adapter event, or token-only receipt must be rejected or held before advertiser
+billing. Realistic-looking impression traffic must still clear backend
+duty-cycle heuristics, strict concurrency limits, aggregate account checks, and
+manual review before it can become billable.
+
+Third-party webview anchoring must fail closed. If an upstream surface changes
+an expected anchor, bundle shape, or compatibility fingerprint, the adapter
+enters probe or incompatible mode until a signed compatibility manifest and
+release gate approve the new surface version. Anchor drift must never silently
+create earning candidates, billable reach, or payable developer rewards.
 
 ## Trust Boundaries
 
@@ -56,9 +100,9 @@ money-movement requests.
 ### Official Opt-In Earning Adapters
 
 Official opt-in earning adapters are the only surfaces allowed to create earning
-candidates. This rule is surface-neutral: Axl's working adapters already cover
-desktop, CLI/TUI, Telegram, Discord, chat, and agent workflow surfaces when they
-are registered, consented, proof-backed, and backend settled.
+candidates. This rule is surface-neutral: desktop, CLI/TUI, Telegram, Discord,
+chat, and agent workflow surfaces may monetize only when they are registered,
+consented, proof-backed, and backend settled.
 
 Every agent interaction with developer attention is advertising inventory only
 if it is implemented as one of those official opt-in adapters. Status messages,
@@ -72,7 +116,8 @@ Required adapter controls:
 - clear user consent and a visible off switch;
 - authenticated user, session, adapter, and surface identity;
 - adapter ID/version, campaign/creative ID, render timestamp, threshold
-  timestamp, cap context, visibility proof, and backend nonce or receipt;
+  timestamp, cap context, visibility proof, signed receipt, server-issued
+  single-use nonce, and backend replay ledger status;
 - rate limits, campaign caps, duplicate rejection, and fraud-review hooks;
 - backend attestation and reconciliation before advertiser billing;
 - refund windows, KYC/vendor eligibility, and settlement gates before payout or
@@ -83,17 +128,17 @@ controls before it can become billable, and it must pass review, refund, and
 payout windows before it can become payable.
 
 Unofficial adapters, local dashboard actions, diagnostics, slash commands,
-repair tests, and generated notes stay in `probe_non_earning` or
-`observed_local` states.
+repair tests, and generated notes stay in `probe` or `observed_local` states.
 Those local states are never payable and must not be promoted by local code.
 
 ### Backend Trust And Settlement
 
-The Kickback.ai backend owns adapter receipt acceptance, duplicate rejection,
-caps, velocity checks, invalid-traffic filtering, advertiser billable counts,
-refund or credit decisions, payout holds, and payout release. Backend ledgers
-are the source of truth for accepted, billable, payable, credited, refunded,
-rejected, fraudulent, held, and reversed states.
+The Kickback.ai backend owns adapter receipt acceptance, server nonce issuance
+and consumption, duplicate rejection, caps, duty-cycle checks, strict
+concurrency limits, velocity checks, invalid-traffic filtering, advertiser
+billable counts, refund or credit decisions, payout holds, and payout release.
+Backend ledgers are the source of truth for accepted, billable, payable,
+refunded, rejected, fraudulent, held, and paid states.
 
 ### Stripe And Vendor Credit Rails
 
@@ -105,19 +150,26 @@ charges, create transfers, create payouts, issue refunds, mint credits, choose
 credit multipliers, link vendor accounts silently, or infer payout finality from
 local logs.
 
+International payout readiness is backend-owned. The backend must handle
+connected-account country support, requested capabilities, account-link
+expiration and return/refresh URLs, onboarding completion, verification
+requirements, tax/reporting status, payout holds, and unsupported-country
+fallbacks before the UI presents a user as payout-ready.
+
 ### ML And Bot Signals
 
 ML is a signal layer, not settlement authority. Models may provide risk scores,
-cluster evidence, anomaly signals, and reason-code candidates for backend
+cluster evidence, anomaly signals, saturation-script similarity, nonce-replay
+signals, anchor-compatibility signals, and reason-code candidates for backend
 review, but deterministic policy, review evidence, and backend event-state
 ledgers decide whether an event is accepted, billed, rejected, refunded, held,
-credited, reversed, or paid.
+fraudulent, or paid.
 
 ### Hermes, Chat, Skills, And Developer Notes
 
 Hermes/chat integrations, Claude/Codex/Hermes skills, slash commands, generated
 developer notes, and plugin tools are explanation and repair surfaces unless
-they invoke one of Axl's registered official opt-in adapters for that surface. They can
+they invoke a registered official opt-in adapter for that surface. They can
 run local read-only commands, summarize ledger freshness, inspect install state,
 and hand implementation work to Codex. They must not call payable metrics/events
 routes, fabricate impressions, create credits, or invoke Stripe/vendor
@@ -135,7 +187,7 @@ Installer and repair flows may write marker-owned local integration files, wrap
 supported commands, and restore marker-owned artifacts. They are non-earning
 probes unless a separate registered official opt-in earning adapter handles that
 surface. Setup tests and repair checks must not advance an event beyond
-`probe_non_earning`.
+`probe`.
 
 ## Responsible Disclosure
 

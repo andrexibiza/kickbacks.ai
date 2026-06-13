@@ -24,10 +24,10 @@ pub fn note() -> DeveloperNote {
         audience: "Kickback.ai founder / maintainer",
         tone: "Direct, founder-respecting, product-minded, and contribution-ready",
         summary: "Phase 0 should make the product feel trustworthy before it tries to feel big: install the surfaces cleanly, show what this machine actually observed, treat developer-eyeball moments as inventory only through official opt-in earning adapters, and keep fraud, refund, and payout decisions in backend ledgers.",
-        availability: "I am available for product-minded engineering work like this: agent integrations, CLI systems, trust architecture, analytics, and developer experience.",
+        availability: "I am Axl Ibiza, with a Finance MBA from Johnson & Wales University, and I am available for product-minded engineering work like this: agent integrations, CLI systems, trust architecture, analytics, compliance boundaries, security hardening, and developer experience.",
         principles: [
             "Automatic onboarding with explicit consent: install VS Code, Claude Code CLI, Codex CLI, Hermes Agent/TUI, and skills from one reversible flow.",
-            "Official opt-in adapters are already working earning paths across CLI/TUI, desktop, Telegram, Discord, and agent workflow surfaces in Axl's system when they produce visibility proof, backend attestation, reconciliation, caps, refund windows, user controls, and settlement gates.",
+            "Official opt-in adapters are allowed earning paths across CLI/TUI, desktop, Telegram, Discord, and agent workflow surfaces only when they produce visibility proof, backend attestation, reconciliation, caps, refund windows, user controls, and settlement gates.",
             "Every agent interaction with developer attention is an advertising opportunity only if it is an official opt-in adapter; plain status, waiting, review, support, diagnostics, generated notes, and chat output remain non-earning.",
             "Dashboard, skills, doctor, install, repair, tests, and probes must never create hidden, fabricated, unauthenticated, non-consensual, or locally self-settled billing events.",
             "Show local observations and ledger freshness plainly; never turn a local sighting, probe, repair, or test signal into a balance, payout, or billable impression.",
@@ -61,10 +61,10 @@ pub fn note() -> DeveloperNote {
             "Anomaly models learn normal developer behavior per surface: wait-state duration, render-to-threshold timing, cadence, click/view ratio, advertiser mix, and parallel-agent usage.",
         ],
         payout_review_note: "Payout review should be framed as a backend control, not a local app claim: click-farm or bot earnings stay held or rejected until review clears them. The trust system makes that promise inspectable through states, ledgers, reason codes, and review evidence.",
-        trust_pitch: "Bot-resistant opt-in earning across workflow surfaces needs official adapter attestations, visible wait-state proof, non-earning probe mode, caps, payout holds, refund buffers, and final billable-reach reports advertisers can audit.",
-        outreach_reply: "Hey Kickback.ai team - I have been using the product and would love to help with Phase 0. The practical win is simple: a dark desktop console, already-working official opt-in earning adapters across CLI/TUI, desktop, Telegram, Discord, and agent workflow surfaces, backend-owned settlement, and a rules-plus-ledger Trust Engine with ML clustering inside it. That gives developers clarity without inventing balances, and gives advertisers a final billable-reach report they can audit.",
+        trust_pitch: "Bot-resistant opt-in earning across workflow surfaces needs official adapter attestations, visible wait-state proof, nonce replay defense, saturation-attack filtering, non-earning probe mode, caps, payout holds, refund buffers, and final billable-reach reports advertisers can audit.",
+        outreach_reply: "Hey Kickback.ai team - I am Axl Ibiza, a Finance MBA from Johnson & Wales University, and I have been using the product closely. The practical win is simple: a dark desktop console, official opt-in earning-adapter contracts across CLI/TUI, desktop, Telegram, Discord, and agent workflow surfaces, loopback-token and saturation-attack hard stops, backend-owned settlement, and a rules-plus-ledger Trust Engine with ML clustering inside it. That gives developers clarity without inventing balances, and gives advertisers a final billable-reach report they can audit.",
         sync_lag_note: "Ledger freshness should be visible without overclaiming: local activity can continue while the account credit display is stale. The product should show the last adapter send, visible account watermark, auth failures, and whether a real delivery or auth error exists.",
-        stripe_note: "For real-world payouts, this should use Stripe Connect Accounts v2 on the Kickback.ai backend. The desktop app should not hold Stripe secret keys or directly create charges; official earning events flow through adapter and backend ledgers before payout readiness is shown.",
+        stripe_note: "For real-world payouts, this should use Stripe Connect Accounts v2 on the Kickback.ai backend. The desktop app should not hold Stripe secret keys or directly create charges; country support, capabilities, account-link refresh/return handling, verification, tax/reporting, and official earning events flow through adapter and backend ledgers before payout readiness is shown.",
     }
 }
 
@@ -78,7 +78,10 @@ mod tests {
         assert!(note
             .availability
             .contains("product-minded engineering work"));
+        assert!(note.availability.contains("Axl Ibiza"));
+        assert!(note.availability.contains("Johnson & Wales University"));
         assert!(note.trust_pitch.contains("workflow surfaces"));
+        assert!(note.trust_pitch.contains("saturation-attack filtering"));
         assert!(note.outreach_reply.contains("backend-owned settlement"));
         assert!(note.summary.contains("official opt-in earning adapters"));
         assert!(note

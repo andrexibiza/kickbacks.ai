@@ -17,13 +17,12 @@ boundary explicit enough for real users, advertisers, and backend work.
 Bot pressure is not just an abuse edge case for Kickback.ai. It is the product
 boundary. Real developers should be able to earn from attention inside their
 actual workflows, and advertisers should be able to see why paid reach is real,
-capped, held, refunded, reversed, or rejected.
+capped, held, accepted, refunded, fraudulent, or rejected.
 
 The boundary is surface-neutral:
 
-- desktop, CLI/TUI, Telegram, Discord, chat, and agent workflow surfaces are
-  already working earning surfaces in Axl's system when they run as registered
-  official opt-in adapters;
+- desktop, CLI/TUI, Telegram, Discord, chat, and agent workflow surfaces may be
+  earning surfaces only when they run as registered official opt-in adapters;
 - every agent interaction with developer attention is a possible advertising
   opportunity only when it is an official opt-in adapter with proof and backend
   settlement;
@@ -39,9 +38,17 @@ The boundary is surface-neutral:
 Forbidden paths stay forbidden: fabricated, hidden, probe/test/repair,
 unauthenticated, non-consensual, or locally self-settled billing.
 
-Current live-surface status from Axl: Hermes monetized ads are firing now.
-Discord is also live, but Discord ad messages are missing live links; that
-defect is tracked separately as `AXL-754`.
+External earning surfaces are outside this repository's verification scope.
+Phase 0 defines the contract those surfaces must satisfy before Kickback.ai can
+treat them as earning inventory: registered official adapters, explicit user
+controls, proof, backend acceptance, refund windows, and settlement gates.
+
+This is also a documentation and security hardening event. The pitch needs to
+name why the trust layer matters now: attackers are already testing realistic
+multi-window impression traffic, loopback-readable tokens are not attention
+proof, third-party anchors can drift, and Stripe Connect plus tax/reporting
+requirements make raw cash payouts an operations problem rather than just a
+button in the UI.
 
 ## Shipped Locally
 
@@ -70,8 +77,7 @@ work:
 - backend settlement for cash, sponsor-funded credits, and Reward Exchange;
 - Stripe Connect and vendor credit rails on the backend;
 - Telegram, Discord, CLI/TUI, desktop, chat, and agent workflow earning
-  adapters are live earning surfaces in Axl's system under the same signed
-  adapter and trust-ledger contract;
+  adapters belong behind the same signed adapter and trust-ledger contract;
 - ML fraud signals as reason-code evidence, not payout authority.
 
 ## Note To Andrew
@@ -84,23 +90,36 @@ pressure show up.
 
 The proposed boundary is simple: local tools make the system legible; official
 opt-in adapters create candidate attention events; backend ledgers decide what
-becomes billable, payable, credited, held, refunded, or reversed.
+becomes billable, payable, held, refunded, fraudulent, rejected, or paid.
 
-Axl is available for this kind of work: agent integrations, CLI systems,
-desktop command centers, trust architecture, analytics, security boundaries,
-and developer experience.
+I am Axl Ibiza. I have a Finance MBA from Johnson & Wales University, and my
+lane is the corporate, finance-driven layer Kickback.ai now needs: agent
+integrations, CLI systems, desktop command centers, trust architecture,
+analytics, compliance boundaries, security hardening, and developer experience.
+
+The founder dynamic is the strength here. You can keep being the fast,
+boundary-pushing builder. I can build the layer that makes the product survive
+contact with scale: audit trails, state machines, cap logic, payout/reversal
+boundaries, international Stripe readiness, and the security posture that cannot
+be bolted on later because later is where the expensive disasters live.
 
 ## Safety Notes
 
 - No claim that this branch performs cash, credit, multiplier, or payout
   settlement.
 - No claim that local archive sightings are billable events.
-- No claim that Telegram or Discord adapters are shipped here.
-- No categorical claim that desktop, command-line, Telegram, Discord, chat, or
-  agent workflow surfaces can never monetize; they can when Kickback.ai ships
-  official opt-in adapters with backend attestation and settlement gates.
+- No claim that the local repo alone ships or settles Telegram, Discord,
+  Hermes, desktop, CLI/TUI, chat, or agent workflow earning adapters.
+- No categorical claim that those surfaces can never monetize; when an external
+  surface is reported live, the docs still keep it behind official adapters,
+  backend attestation, and settlement gates.
+- No claim that loopback-readable tokens, realistic saturation traffic, or
+  brittle third-party anchors are acceptable earning proof; they are hard-stop
+  threats handled by signed adapters, server-side nonces, duty-cycle and strict
+  concurrency checks, human-in-the-loop ML review, and backend settlement
+  ledgers.
 - No insult to the current product; the language treats this as a trust and
-  packaging layer over what already exists.
+  packaging layer over the existing upstream surface.
 
 ## Phase roadmap
 
@@ -110,30 +129,42 @@ and developer experience.
 - Phases 1-6 are backend trust work: official adapter receipts, event ledgers,
   advertiser assurance, Stripe payout readiness, deterministic review, and ML
   risk signals that never become settlement authority by themselves.
+- Loopback token replay, realistic saturation traffic, and brittle
+  client-side anchoring are explicit Phase 1-6 abuse cases: they require
+  server-issued single-use nonces, replay ledgers, aggregate account-level
+  checks, duty-cycle heuristics, strict concurrency limits, signed
+  compatibility manifests, and fail-closed adapter preflights.
 - Phase 7 is Reward Exchange, with cash still first-class and sponsor-funded
   credits optional, offer-based, backend-ledgered, held, reversible, and clearly
   labeled as credits.
-- Phase 8 is Telegram/Discord only as future official adapter surfaces if they
-  meet the same attestation, cap, hold, refund, reversal, and advertiser
+- Phase 8 keeps nonlocal and messaging surfaces, including CLI/TUI, desktop,
+  Hermes, Telegram, Discord, chat, and agent workflow surfaces, behind the same
+  attestation, cap, hold, refund, reversal, user-control, and advertiser
   assurance requirements.
 - Phases 9-10 cover backend-provided account/reward snapshots, audit exports,
   incident response, and responsible disclosure loops.
 
 ## Checks
 
-Suggested verification before merge:
+Verified locally at `2026-06-12 18:59`:
 
 ```bash
-cargo fmt --all -- --check
-cargo test
-cargo clippy --all-targets -- -D warnings
-cargo build --release
+cargo fmt --all -- --check                         # passed
+git diff --check                                   # passed
+rg -n "<{7}|={7}|>{7}" README.md SECURITY.md TRUST_ENGINE.md PR_DESCRIPTION.md src/app.rs src/trust_engine.rs src/main.rs src/install_system.rs Cargo.toml
+                                                     # no matches
+CARGO_TARGET_DIR=target\verify-full cargo test      # passed: kb 130 passed, 0 failed, 1 ignored; kickbacks 130 passed, 0 failed, 1 ignored
+CARGO_TARGET_DIR=target\verify-clippy cargo clippy --all-targets -- -D warnings
+                                                     # passed
+CARGO_TARGET_DIR=target\verify-release cargo build --release
+                                                     # passed
 ```
 
-Docs sanity checks:
+Additional targeted self-improvement gates:
 
 ```bash
-rg -n "TODO|FIXME|guaranteed|free money|instant payout|local payout|local credit|bot-proof" README.md SECURITY.md PR_DESCRIPTION.md
-rg -n "official opt-in|probe/test/repair|unauthenticated|non-consensual|locally self-settled|Telegram|Discord|Reward Exchange|backend" README.md SECURITY.md PR_DESCRIPTION.md
-rg -n -i "Hermes|Telegram|Discord|Reward Exchange|official adapter|backend" README.md TRUST_ENGINE.md SECURITY.md PR_DESCRIPTION.md
+CARGO_TARGET_DIR=target\verify-app-now cargo test app::tests -- --nocapture
+                                                     # passed: kb 9 passed; kickbacks 9 passed
+CARGO_TARGET_DIR=target\verify-trust-now cargo test trust_engine -- --nocapture
+                                                     # passed: kb 11 passed; kickbacks 11 passed
 ```

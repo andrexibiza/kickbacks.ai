@@ -415,6 +415,8 @@ pub fn current(archive: &Archive) -> Result<TrustEngineSnapshot> {
                 "billed impression ledger",
                 "refund ledger",
                 "campaign exposure limits",
+                "server nonce replay ledger",
+                "duty-cycle and strict concurrency limits",
                 "IP/ASN/device cluster graph",
                 "Stripe payout hold state",
             ],
@@ -580,6 +582,11 @@ fn cap_reason_ledger() -> Vec<CapReason> {
             advertiser_safe: true,
         },
         CapReason {
+            reason: "continuous_duty_cycle_limit",
+            state: "hold_or_cap_when_rest_windows_look_synthetic",
+            advertiser_safe: true,
+        },
+        CapReason {
             reason: "probe_mode",
             state: "non_earning_test_event",
             advertiser_safe: true,
@@ -595,6 +602,27 @@ fn backend_owned_boundaries() -> Vec<BackendOwnedBoundary> {
                 "server nonce, adapter signing keys, duplicate rejection, and replay defense are not knowable from a local archive",
             local_snapshot_policy:
                 "show adapter candidates only; never treat a local render or log line as accepted",
+        },
+        BackendOwnedBoundary {
+            decision: "loopback_token_replay_defense",
+            why_backend_owned:
+                "VS Code-readable or loopback API tokens prove local access only; they do not prove human attention, visibility, or authorization to bill",
+            local_snapshot_policy:
+                "treat loopback-token-only evidence as non-billable or held until a signed adapter receipt and server-issued single-use nonce clear backend replay checks",
+        },
+        BackendOwnedBoundary {
+            decision: "saturation_attack_filtering",
+            why_backend_owned:
+                "variable cadence, positive jitter, odd durations, alternating surfaces, rest cycles, and concurrency patterns require aggregate account history across surfaces and machines",
+            local_snapshot_policy:
+                "surface local volume and cadence warnings only; never locally clear realistic-looking impression traffic for billing or payout",
+        },
+        BackendOwnedBoundary {
+            decision: "adapter_compatibility_and_anchor_health",
+            why_backend_owned:
+                "third-party webview anchors and upstream bundle shapes can drift; official earning adapters need signed compatibility manifests and release gates",
+            local_snapshot_policy:
+                "fail closed into probe or incompatible status when an anchor preflight fails; do not silently inject, earn, or bill through an unapproved anchor",
         },
         BackendOwnedBoundary {
             decision: "billable_event_creation",
@@ -660,7 +688,9 @@ fn trust_boundaries() -> Vec<TrustBoundary> {
                 "render event",
                 "wait-state threshold",
                 "monotonic sequence",
-                "server nonce or signed receipt",
+                "server-issued single-use nonce",
+                "adapter signature and key id",
+                "compatibility manifest",
             ],
             allowed_to_advance: "candidate_adapter_attested for backend gates",
             can_create_billable_event: false,
@@ -675,9 +705,13 @@ fn trust_boundaries() -> Vec<TrustBoundary> {
                 "account/session graph",
                 "IP/ASN/device cluster checks",
                 "velocity limits",
+                "duty-cycle heuristics",
+                "strict concurrency limits",
                 "cap ledger",
+                "server nonce replay ledger",
                 "campaign exposure limits",
                 "duplicate-event rejection",
+                "adapter compatibility manifest",
             ],
             allowed_to_advance: "billable, held_for_review, rejected, or fraudulent",
             can_create_billable_event: true,
@@ -775,6 +809,33 @@ fn settlement_gates(
             protects_advertiser: true,
         },
         SettlementGate {
+            gate: "server_nonce_and_signature_replay_defense",
+            required_evidence:
+                "Server-issued single-use nonce, adapter signature/key id, session binding, idempotency key, and replay ledger check.",
+            local_status: "backend_required",
+            backend_status: "required before billing",
+            blocks_payout: true,
+            protects_advertiser: true,
+        },
+        SettlementGate {
+            gate: "account_duty_cycle_and_concurrency_limits",
+            required_evidence:
+                "Aggregate account-level checks, duty-cycle heuristics, surface alternation entropy, and strict concurrent-session limits.",
+            local_status: "policy visible; backend required for enforcement",
+            backend_status: "required",
+            blocks_payout: true,
+            protects_advertiser: true,
+        },
+        SettlementGate {
+            gate: "adapter_compatibility_manifest",
+            required_evidence:
+                "Signed adapter compatibility manifest and fail-closed preflight before a third-party surface can create earning candidates.",
+            local_status: "preflight can detect local incompatibility only",
+            backend_status: "must approve adapter version and surface anchor",
+            blocks_payout: true,
+            protects_advertiser: true,
+        },
+        SettlementGate {
             gate: "sync_reconciliation",
             required_evidence:
                 "Visible account ledger watermark catches up to adapter sends; local lag alone is not evidence of Stripe failure.",
@@ -814,7 +875,7 @@ fn settlement_gates(
 
 fn finality_model() -> FinalityModel {
     FinalityModel {
-        invariant: "Opt-in official earning adapters may create earning candidates from approved CLI/TUI, desktop, messaging, or workflow surfaces for backend acceptance gates. No event can become payable from local observation, installer probe, dashboard state, skill output, repair flow, bot/status message, or unauthenticated adapter telemetry.",
+        invariant: "Opt-in official earning adapters may create earning candidates from approved CLI/TUI, desktop, messaging, or workflow surfaces for backend acceptance gates. No event can become payable from local observation, installer probe, dashboard state, skill output, repair flow, bot/status message, loopback-token-only evidence, realistic saturation traffic, brittle anchor fallback, or unauthenticated adapter telemetry.",
         payable_state: "accepted_billable_after_refund_window",
         billing_state_machine: vec![
             BillingState {
@@ -840,6 +901,7 @@ fn finality_model() -> FinalityModel {
                 can_bill_advertiser: false,
                 can_pay_developer: false,
                 next_allowed: vec![
+                    "candidate_adapter_attested",
                     "held_for_review",
                     "eligible_but_capped",
                     "rejected",
@@ -935,6 +997,26 @@ fn finality_model() -> FinalityModel {
                 final_until: "official adapter attestation exists",
             },
             HardStopRule {
+                rule: "loopback_token_only_or_vscode_readable_token",
+                action: "reject_or_hold_pending_signed_adapter_and_server_nonce",
+                final_until: "server-issued nonce, adapter signature, session binding, and replay ledger prove a fresh official receipt",
+            },
+            HardStopRule {
+                rule: "missing_reused_or_expired_server_nonce",
+                action: "reject_duplicate_or_replay",
+                final_until: "a fresh single-use server nonce is issued and consumed by one signed adapter receipt",
+            },
+            HardStopRule {
+                rule: "saturation_cadence_or_duty_cycle_match",
+                action: "hold_for_review_or_fraudulent",
+                final_until: "aggregate account-level duty-cycle, concurrency, cadence, and human-review evidence clears the cluster",
+            },
+            HardStopRule {
+                rule: "unsupported_or_drifted_injection_anchor",
+                action: "force_probe_or_disable_adapter",
+                final_until: "signed compatibility manifest and fail-closed preflight approve the adapter version",
+            },
+            HardStopRule {
                 rule: "cap_exceeded",
                 action: "eligible_but_capped_or_visible_non_billable",
                 final_until: "cap window resets or trust tier increases",
@@ -985,7 +1067,7 @@ fn trust_transition_rules() -> Vec<TrustTransitionRule> {
             to: TrustEventState::CandidateAdapterAttested,
             owner: "opt-in official earning adapter",
             required_evidence:
-                "user opt-in, official adapter id/version, wait-state proof, threshold proof, and signed receipt",
+                "user opt-in, official adapter id/version, wait-state proof, threshold proof, signed receipt, and server-issued single-use nonce",
             can_be_initiated_by_local_surface: true,
             creates_billable_event: false,
             creates_payable_event: false,
@@ -1200,7 +1282,13 @@ fn advertiser_assurance_report() -> AdvertiserAssuranceReport {
                     "receipt_id",
                     "event_id",
                     "server_nonce_id",
+                    "server_nonce_issued_at",
+                    "server_nonce_expires_at",
+                    "nonce_used_at",
                     "adapter_signature",
+                    "adapter_key_id",
+                    "session_binding_hash",
+                    "compatibility_manifest_id",
                     "surface_id",
                     "render_started_at",
                     "threshold_reached_at",
@@ -1217,9 +1305,46 @@ fn advertiser_assurance_report() -> AdvertiserAssuranceReport {
                     "risk_score",
                     "accounts_impacted",
                     "events_impacted",
+                    "cadence_signature",
+                    "duty_cycle_bucket",
+                    "concurrency_window",
+                    "surface_alternation_signature",
                     "decision",
                     "reviewer_or_rule_id",
                     "decision_at",
+                ],
+            },
+            AssuranceTable {
+                table: "server_nonce_replay_ledger",
+                grain: "one row per nonce challenge and consume attempt",
+                purpose: "Prove leaked loopback tokens or replayed receipts could not mint billable events.",
+                minimum_fields: vec![
+                    "server_nonce_id",
+                    "adapter_id",
+                    "adapter_key_id",
+                    "session_binding_hash",
+                    "issued_at",
+                    "expires_at",
+                    "consumed_at",
+                    "consume_attempt_count",
+                    "replay_decision",
+                    "reason_code",
+                ],
+            },
+            AssuranceTable {
+                table: "adapter_compatibility_ledger",
+                grain: "one row per adapter version, surface version, and preflight decision",
+                purpose: "Prove brittle third-party anchors fail closed instead of creating unapproved earning traffic.",
+                minimum_fields: vec![
+                    "adapter_id",
+                    "adapter_version",
+                    "surface_id",
+                    "surface_version",
+                    "compatibility_manifest_id",
+                    "anchor_fingerprint",
+                    "preflight_status",
+                    "earning_enabled",
+                    "approved_at",
                 ],
             },
             AssuranceTable {
@@ -1262,6 +1387,21 @@ fn advertiser_assurance_report() -> AdvertiserAssuranceReport {
             ControlEvidence {
                 control: "official_adapter_only",
                 evidence: "Adapter id/version/signature plus server nonce; dashboard and repair code paths cannot post earning receipts unless they are the signed opt-in adapter for that surface.",
+                advertiser_visible: true,
+            },
+            ControlEvidence {
+                control: "server_side_nonce_replay_defense",
+                evidence: "Loopback-readable tokens are not earning proof; every candidate needs a fresh server-issued nonce consumed once by a signed adapter receipt.",
+                advertiser_visible: true,
+            },
+            ControlEvidence {
+                control: "saturation_attack_filtering",
+                evidence: "Aggregate account-level checks, duty-cycle heuristics, strict concurrency limits, cadence entropy, jitter/duration distributions, and surface alternation review.",
+                advertiser_visible: true,
+            },
+            ControlEvidence {
+                control: "fail_closed_adapter_compatibility",
+                evidence: "Third-party anchor drift disables earning until a signed compatibility manifest and preflight gate approve the adapter version.",
                 advertiser_visible: true,
             },
             ControlEvidence {
@@ -1318,11 +1458,29 @@ fn advertiser_assurance_report() -> AdvertiserAssuranceReport {
                 definition: "Developer payouts released only after trust gates and refund buffer clear.",
                 source: "payout_hold_ledger and Stripe Connect payout state",
             },
+            AdvertiserMetric {
+                metric: "nonce_replay_rejections",
+                definition: "Events rejected because a loopback-readable token, missing nonce, expired nonce, or reused nonce could not prove fresh official adapter attention.",
+                source: "server_nonce_replay_ledger and event_classification_ledger",
+            },
+            AdvertiserMetric {
+                metric: "saturation_held_or_rejected_events",
+                definition: "Events held or removed because cadence, jitter, duration, rest-cycle, surface alternation, or concurrency patterns matched synthetic saturation traffic.",
+                source: "fraud_cluster_ledger and event_classification_ledger",
+            },
+            AdvertiserMetric {
+                metric: "adapter_compatibility_failures",
+                definition: "Events or candidate paths disabled because an upstream surface anchor or adapter compatibility preflight failed closed.",
+                source: "adapter_compatibility_ledger",
+            },
         ],
         audit_artifacts: vec![
             "monthly advertiser trust report",
             "campaign-level invalid traffic appendix",
             "cluster decision export with reason codes",
+            "server nonce replay ledger",
+            "duty-cycle and concurrency report",
+            "adapter compatibility preflight record",
             "refund and credit memo ledger",
             "payout hold/release ledger",
             "adapter version and signing-key change log",
@@ -1378,6 +1536,42 @@ fn threat_model() -> Vec<ThreatModelItem> {
                 "advertiser-visible rejected/refunded ledger",
             ],
         },
+        ThreatModelItem {
+            threat: "loopback_token_replay_revenue_forgery",
+            standard_or_taxonomy: "OWASP OAT-003 plus bearer-token replay abuse",
+            attacker_goal: "use a VS Code-readable or leaked loopback token to forge adapter receipts and claim ad revenue",
+            required_controls: vec![
+                "loopback tokens never count as attention proof",
+                "server-issued single-use nonce with TTL",
+                "adapter signature and key id",
+                "session binding and idempotency key",
+                "backend replay ledger before billing",
+            ],
+        },
+        ThreatModelItem {
+            threat: "realistic_saturation_impression_forgery",
+            standard_or_taxonomy: "OWASP OAT-003/OAT-016 plus SIVT-style synthetic behavior",
+            attacker_goal: "mimic realistic developer workflows with variable cadence, positive jitter, irregular durations, alternating surfaces, continuous caps, and rest cycles",
+            required_controls: vec![
+                "aggregate account-level checks",
+                "duty-cycle heuristics",
+                "strict concurrency limits",
+                "surface alternation entropy",
+                "human-in-the-loop review for high-similarity clusters",
+            ],
+        },
+        ThreatModelItem {
+            threat: "brittle_client_side_anchor_drift",
+            standard_or_taxonomy: "adapter integrity and supply-chain compatibility failure",
+            attacker_goal: "abuse uncoordinated third-party file modifications or stale anchors so an adapter initializes in an unsupported state",
+            required_controls: vec![
+                "signed adapter compatibility manifest",
+                "fail-closed preflight checks",
+                "surface version and anchor fingerprint ledger",
+                "no earning candidates while incompatible",
+                "release gates for upstream bundle changes",
+            ],
+        },
     ]
 }
 
@@ -1407,6 +1601,15 @@ fn ml_signal_layer() -> MlSignalLayer {
             "account_cluster_similarity",
             "refund_reversal_history",
             "campaign_concentration",
+            "server_nonce_missing_or_reused",
+            "loopback_token_only_signal",
+            "event_interarrival_entropy",
+            "positive_jitter_pattern",
+            "odd_duration_distribution",
+            "surface_alternation_entropy",
+            "continuous_duty_cycle_window",
+            "strict_concurrency_count",
+            "adapter_anchor_fingerprint",
         ],
         model_layers: vec![
             ModelLayer {
@@ -1432,9 +1635,18 @@ fn ml_signal_layer() -> MlSignalLayer {
                 role:
                     "Learn normal developer-tool behavior per surface and detect cadence or wait-state patterns that simple thresholds miss.",
                 output:
-                    "anomaly data points such as wait_state_entropy_low, impossible_cadence, or parallel_agent_pattern_shift",
+                    "anomaly data points such as wait_state_entropy_low, impossible_cadence, saturation_cadence_similarity, or parallel_agent_pattern_shift",
                 settlement_authority:
                     "adds evidence only; manual review and deterministic caps remain decisive",
+            },
+            ModelLayer {
+                layer: "adapter_integrity_model",
+                role:
+                    "Compare adapter receipts against nonce ledgers, compatibility manifests, anchor fingerprints, and known replay signatures.",
+                output:
+                    "integrity data points such as loopback_token_replay, server_nonce_reused, adapter_signature_invalid, or adapter_anchor_incompatible",
+                settlement_authority:
+                    "cannot settle; duplicate/replay policy and human review own holds, rejections, and release decisions",
             },
         ],
         reason_codes: vec![
@@ -1447,6 +1659,16 @@ fn ml_signal_layer() -> MlSignalLayer {
             "campaign_concentration_high",
             "asn_cluster_risk",
             "refund_reversal_similarity",
+            "vscode_loopback_token_exposed",
+            "loopback_token_replay",
+            "server_nonce_missing",
+            "server_nonce_reused",
+            "adapter_signature_invalid",
+            "saturation_cadence_similarity",
+            "duty_cycle_cap_evasion",
+            "surface_alternation_synthetic",
+            "strict_concurrency_exceeded",
+            "adapter_anchor_incompatible",
         ],
         feedback_loop: vec![
             "manual_review_decisions",
@@ -1461,6 +1683,8 @@ fn ml_signal_layer() -> MlSignalLayer {
             "start with shadow scoring and calibration against known labeled bots",
             "graduate to review queue prioritization when precision is measurable",
             "allow holds only when model signals combine with deterministic policy evidence",
+            "force loopback-token-only and nonce-replay evidence into rejection or review before billing",
+            "treat known saturation scripts as training labels without allowing the model to settle payouts by itself",
             "reserve rejection for policy violations, duplicate/replay proof, confirmed bot labels, or high-precision reviewed clusters",
             "publish model reason codes into the event classification ledger",
         ],
@@ -1705,6 +1929,14 @@ fn cluster_signals(
             backend_signal_needed: "signed adapter install fingerprints",
         },
         ClusterSignal {
+            signal: "loopback_token_replay",
+            severity: "backend_required",
+            local_evidence: "local apps can expose loopback-token risk, but token possession is not attention proof"
+                .to_string(),
+            backend_signal_needed:
+                "server nonce ledger, adapter signatures, session binding, and replay attempts",
+        },
+        ClusterSignal {
             signal: "impossible_cadence",
             severity: if stats.sightings_today > 250 {
                 "review"
@@ -1715,6 +1947,19 @@ fn cluster_signals(
             backend_signal_needed: "per-user and per-surface event cadence",
         },
         ClusterSignal {
+            signal: "saturation_cadence_similarity",
+            severity: if stats.sightings_today > 250 {
+                "review"
+            } else {
+                "watch"
+            },
+            local_evidence:
+                "local archive cannot validate variable cadence, positive jitter, odd durations, and rest-cycle realism across accounts"
+                    .to_string(),
+            backend_signal_needed:
+                "inter-arrival entropy, jitter distribution, duration histogram, cap/rest duty cycle, and cross-surface sequence model",
+        },
+        ClusterSignal {
             signal: "parallel_agent_explosion",
             severity: if active_surface_count > 3 {
                 "review"
@@ -1723,6 +1968,26 @@ fn cluster_signals(
             },
             local_evidence: format!("{active_surface_count} locally enabled surfaces detected"),
             backend_signal_needed: "active sessions per user across VS Code, Claude, Codex, Hermes",
+        },
+        ClusterSignal {
+            signal: "strict_concurrency_exceeded",
+            severity: if active_surface_count > 3 {
+                "review"
+            } else {
+                "backend_required"
+            },
+            local_evidence: format!("{active_surface_count} locally enabled surfaces detected"),
+            backend_signal_needed:
+                "concurrent earning sessions per user, device, surface, campaign, and account cluster",
+        },
+        ClusterSignal {
+            signal: "adapter_anchor_drift",
+            severity: "backend_required",
+            local_evidence:
+                "preflight can detect a missing local anchor, but approval must come from a signed compatibility manifest"
+                    .to_string(),
+            backend_signal_needed:
+                "surface version, adapter version, anchor fingerprint, compatibility manifest, and release gate status",
         },
         ClusterSignal {
             signal: "click_only_behavior",
@@ -1774,6 +2039,11 @@ fn advertiser_protection() -> AdvertiserProtection {
             "per-surface caps",
             "new-account caps",
             "parallel-agent caps",
+            "strict concurrent-session limits",
+            "server nonce TTL and single-use replay defense",
+            "aggregate duty-cycle and rest-window review",
+            "surface-alternation entropy review",
+            "adapter compatibility fail-closed gates",
             "campaign-level spend and reach ceilings",
             "refund buffer before payout finality",
         ],
@@ -1841,7 +2111,9 @@ fn recent_event_proofs(events: Vec<LedgerEvent>) -> Vec<EventProof> {
             payable: false,
             backend_required: vec![
                 "official adapter receipt",
+                "server-issued single-use nonce",
                 "backend duplicate/cap/cluster checks",
+                "aggregate duty-cycle and concurrency review",
                 "accepted event ledger row",
             ],
             proof: "Local archive sighting proves the creative was observed by this machine; payability requires official adapter threshold, backend acceptance, and refund-window clearance.",
@@ -2112,7 +2384,7 @@ mod tests {
         }
 
         for rule in &snapshot.finality_model.transition_rules {
-            if rule.to == TrustEventState::Paid {
+            if rule.to == TrustEventState::Paid && rule.from != TrustEventState::Paid {
                 assert_eq!(
                     rule.from,
                     TrustEventState::AcceptedBillableAfterRefundWindow
@@ -2176,6 +2448,113 @@ mod tests {
             .advertiser_protection
             .proof_statement
             .contains("payout releases"));
+    }
+
+    #[test]
+    fn loopback_token_saturation_and_anchor_attacks_are_hard_stopped() {
+        let archive = Archive::open_in_memory().unwrap();
+        let snapshot = current(&archive).unwrap();
+
+        let hard_stops: HashSet<&str> = snapshot
+            .finality_model
+            .hard_stop_rules
+            .iter()
+            .map(|rule| rule.rule)
+            .collect();
+        for rule in [
+            "loopback_token_only_or_vscode_readable_token",
+            "missing_reused_or_expired_server_nonce",
+            "saturation_cadence_or_duty_cycle_match",
+            "unsupported_or_drifted_injection_anchor",
+        ] {
+            assert!(hard_stops.contains(rule), "missing hard stop {rule}");
+        }
+
+        let backend_decisions: HashSet<&str> = snapshot
+            .backend_owned_boundaries
+            .iter()
+            .map(|boundary| boundary.decision)
+            .collect();
+        for decision in [
+            "loopback_token_replay_defense",
+            "saturation_attack_filtering",
+            "adapter_compatibility_and_anchor_health",
+        ] {
+            assert!(
+                backend_decisions.contains(decision),
+                "missing backend-owned decision {decision}"
+            );
+        }
+
+        let controls: HashSet<&str> = snapshot
+            .advertiser_assurance
+            .control_evidence
+            .iter()
+            .filter(|control| control.advertiser_visible)
+            .map(|control| control.control)
+            .collect();
+        for control in [
+            "server_side_nonce_replay_defense",
+            "saturation_attack_filtering",
+            "fail_closed_adapter_compatibility",
+        ] {
+            assert!(
+                controls.contains(control),
+                "missing advertiser-visible control {control}"
+            );
+        }
+
+        let tables: HashSet<&str> = snapshot
+            .advertiser_assurance
+            .required_tables
+            .iter()
+            .map(|table| table.table)
+            .collect();
+        assert!(tables.contains("server_nonce_replay_ledger"));
+        assert!(tables.contains("adapter_compatibility_ledger"));
+
+        let threats: HashSet<&str> = snapshot
+            .threat_model
+            .iter()
+            .map(|threat| threat.threat)
+            .collect();
+        for threat in [
+            "loopback_token_replay_revenue_forgery",
+            "realistic_saturation_impression_forgery",
+            "brittle_client_side_anchor_drift",
+        ] {
+            assert!(threats.contains(threat), "missing threat {threat}");
+        }
+
+        let reason_codes: HashSet<&str> = snapshot
+            .ml_signal_layer
+            .reason_codes
+            .iter()
+            .copied()
+            .collect();
+        for code in [
+            "loopback_token_replay",
+            "server_nonce_reused",
+            "saturation_cadence_similarity",
+            "strict_concurrency_exceeded",
+            "adapter_anchor_incompatible",
+        ] {
+            assert!(reason_codes.contains(code), "missing reason code {code}");
+        }
+
+        let cluster_signals: HashSet<&str> = snapshot
+            .cluster_detection
+            .iter()
+            .map(|signal| signal.signal)
+            .collect();
+        for signal in [
+            "loopback_token_replay",
+            "saturation_cadence_similarity",
+            "strict_concurrency_exceeded",
+            "adapter_anchor_drift",
+        ] {
+            assert!(cluster_signals.contains(signal), "missing signal {signal}");
+        }
     }
 
     #[test]

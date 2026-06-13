@@ -48,6 +48,17 @@ and click-farm or bot earnings are held or rejected rather than paid. This Trust
 Engine turns that product promise into explicit state transitions, ledgers,
 model signals, review queues, and advertiser-visible evidence.
 
+## Two-Way Founder Contract
+
+Phase 0 should be easy for founders to explain in both directions:
+
+- developers see when activity is local proof, an approved adapter candidate, a
+  held or capped event, a backend-accepted event, or a released cash payout;
+- advertisers see gross adapter events, holds, exclusions, refunds, reversals,
+  final billable reach, and payout releases without trusting local-only logs;
+- the backend remains the system of record for settlement, while local surfaces
+  remain useful witnesses, status readers, and reconciliation inputs.
+
 ## Official Adapter Contract
 
 Official opt-in earning adapters are the only path from developer activity to
@@ -68,11 +79,47 @@ An earning adapter should provide:
 | `wait_state_proof` | Shows the developer was in a measurable wait state. |
 | `threshold_reached_at` | Proves the minimum visibility or attention threshold. |
 | `cap_context` | Makes campaign, user, and surface caps explainable. |
-| `backend_nonce` or `signed_receipt` | Blocks replay and unauthenticated event creation. |
+| `server_nonce_id`, `nonce_issued_at`, `nonce_expires_at`, and `nonce_used_at` | Proves a backend-issued single-use challenge was consumed once. |
+| `signed_receipt`, `adapter_key_id`, and `session_binding_hash` | Blocks token-only replay and binds the receipt to an approved adapter/session. |
+| `compatibility_manifest_id` and `anchor_fingerprint` | Proves the adapter was approved for the current third-party surface version. |
 
 The adapter creates a candidate. It does not create a payout. Backend ledgers
 still own caps, invalid-traffic review, advertiser refunds, billing acceptance,
 and payout finality.
+
+## Loopback Token And Saturation Immunity
+
+Readable loopback tokens are bearer material, not earning proof. A token visible
+inside VS Code, a local API client, or a diagnostic process cannot prove human
+attention, viewability, freshness, campaign eligibility, or payout authority.
+Token-only evidence must stay non-billable until a signed official adapter
+receipt consumes a fresh server-issued nonce and clears backend replay checks.
+
+Proof-of-concept traffic scripts such as `attack-real.mjs` are treated as a
+realistic abuse class, not an edge case. Variable cadence, positive jitter,
+irregular durations, alternating status-bar/terminal surfaces, continuous caps,
+and rest cycles must be checked against aggregate backend state:
+
+- account-level and campaign-level caps;
+- duty-cycle and rest-window heuristics;
+- strict concurrent-session limits across surfaces and machines;
+- inter-arrival entropy, duration histograms, jitter distributions, and surface
+  alternation signatures;
+- IP/ASN/device/account/payout graph clusters;
+- human review for high-similarity clusters before payout release.
+
+The backend should emit advertiser-visible reason codes such as
+`loopback_token_replay`, `server_nonce_missing`, `server_nonce_reused`,
+`adapter_signature_invalid`, `saturation_cadence_similarity`,
+`duty_cycle_cap_evasion`, `surface_alternation_synthetic`,
+`strict_concurrency_exceeded`, and `adapter_anchor_incompatible`.
+
+Third-party webview anchoring must fail closed. If a Claude, VS Code, Codex,
+Hermes, Telegram, Discord, or other supported surface changes an expected
+bundle anchor or template shape, the adapter becomes probe-only or incompatible
+until a signed compatibility manifest and release gate approve the new surface
+version. A broken anchor must never silently create earning candidates,
+billable reach, or payable rewards.
 
 ## State Machine
 
@@ -117,12 +164,18 @@ These decisions require global state and must remain backend-owned:
 
 - adapter receipt acceptance: server nonce, signing keys, duplicate rejection,
   and replay defense
+- loopback-token replay defense: readable local tokens prove bearer possession,
+  not human attention or advertiser-safe reach
 - billable event creation: campaign budgets, advertiser contracts, exposure
   ceilings, and accepted-event ledgers
 - caps and velocity: hourly, daily, per-surface, campaign, new-account, and
   parallel-agent limits across users and machines
+- duty-cycle and strict concurrency enforcement: rest-window patterns,
+  surface-alternation sequences, and active sessions across users and machines
 - fraud clusters and invalid traffic: IP, ASN, device, payout identity, account,
-  cadence, and advertiser-wide traffic quality
+  cadence, jitter, duration, and advertiser-wide traffic quality
+- adapter compatibility: signed compatibility manifests, anchor fingerprints,
+  and fail-closed preflight decisions for third-party surface drift
 - refunds and adjustments: advertiser billing ledger, campaign period, refund
   window, and final invalid-traffic decision
 - payout release: Stripe/KYC/1099 readiness, held balances, refund buffers, and
@@ -150,7 +203,9 @@ Required ledgers:
 
 - `event_classification_ledger`
 - `adapter_attestation_ledger`
+- `server_nonce_replay_ledger`
 - `fraud_cluster_ledger`
+- `adapter_compatibility_ledger`
 - `advertiser_refund_ledger`
 - `payout_hold_ledger`
 
@@ -197,13 +252,19 @@ Recommended layers:
 | :---- | :----- | :------------------- |
 | `supervised_event_classifier` | Risk data points and reason-code candidates from labeled bot and reviewed clean traffic. | Cannot pay, accept, or reject by itself. |
 | `graph_cluster_model` | Account/device/IP/ASN/adapter/campaign/vendor cluster signals. | Can recommend review or hold evidence only. |
-| `surface_behavior_anomaly_model` | Cadence, wait-state, click/view, parallel-agent, Telegram, Discord, and Hermes anomalies. | Adds evidence; policy gates remain decisive. |
+| `surface_behavior_anomaly_model` | Cadence, wait-state, click/view, saturation-script, parallel-agent, Telegram, Discord, and Hermes anomalies. | Adds evidence; policy gates remain decisive. |
+| `adapter_integrity_model` | Nonce replay, token-only evidence, signature validity, and adapter-anchor compatibility signals. | Cannot settle; replay policy and review own holds or rejection. |
 
 Useful reason codes include `known_bot_similarity`, `high_parallelism_cluster`,
 `new_account_high_velocity`, `shared_device_fingerprint`,
 `wait_state_entropy_low`, `click_view_ratio_abnormal`,
 `campaign_concentration_high`, `asn_cluster_risk`,
-`vendor_account_reuse_risk`, and `refund_reversal_similarity`.
+`vendor_account_reuse_risk`, `refund_reversal_similarity`,
+`vscode_loopback_token_exposed`, `loopback_token_replay`,
+`server_nonce_missing`, `server_nonce_reused`,
+`adapter_signature_invalid`, `saturation_cadence_similarity`,
+`duty_cycle_cap_evasion`, `surface_alternation_synthetic`,
+`strict_concurrency_exceeded`, and `adapter_anchor_incompatible`.
 
 The feedback loop should include known bot labels, manual review decisions,
 released holds, advertiser refunds, payout adjustments, disputes, and confirmed
@@ -218,6 +279,13 @@ The Trust Engine uses standard ad-fraud language:
 - OWASP OAT-019 Account Creation: farmed accounts for payout extraction.
 - MRC/IAB invalid-traffic practice: non-human or non-measurable traffic
   filtering.
+- Loopback-token replay: leaked local bearer material used to forge ad revenue
+  without a fresh server nonce or signed adapter receipt.
+- Realistic saturation attacks: scripts that mimic variable cadence, positive
+  jitter, irregular durations, alternating surfaces, continuous caps, and rest
+  cycles to look like normal developer attention.
+- Brittle client-side anchoring: uncoordinated third-party file modifications
+  that break after upstream bundle changes and must fail closed before earning.
 
 The same boundaries apply to developer-tool surfaces and future messaging
 surfaces. Hermes, Telegram, and Discord can help users inspect or receive
@@ -229,6 +297,12 @@ Stripe Connect is payout infrastructure, not the trust engine. Stripe should
 release funds only after accepted earning, refund buffers, payout holds, KYC,
 1099/reporting, and Connect account requirements clear on the
 Kickback.ai backend.
+
+International onboarding is a backend settlement concern, not a local repair
+task. Country support, requested capabilities, account-link expiration,
+return/refresh handling, onboarding completion, verification requirements,
+tax/reporting status, payout holds, and unsupported-country fallbacks must be
+ledger-visible before the UI presents a user as payout-ready.
 
 Local surfaces must never hold Stripe secret keys, create money movement,
 release cash payouts, create sponsor credits, apply exchange multipliers, link
