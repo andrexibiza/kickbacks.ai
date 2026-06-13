@@ -1,98 +1,21 @@
-Kickbacks Extension — Proprietary, Source-Available License
-Copyright (c) 2026 ShiftKeys, Inc. All rights reserved.
+MIT License
 
-This is NOT open-source software. The Kickbacks extension, including its source
-code, object code, design, structure, and accompanying materials (the
-"Software"), is the proprietary property of ShiftKeys, Inc. ("ShiftKeys"). The
-Software is licensed, not sold, and is protected by copyright and other
-intellectual property laws. ShiftKeys makes the source publicly viewable for
-transparency only; doing so waives no rights and grants no license except as
-expressly stated below.
+Copyright (c) 2026 Ahmad Othman Ammar Adi
 
-1. RESERVATION OF RIGHTS
-   All right, title, and interest in and to the Software — including all
-   intellectual property rights — are and remain the exclusive property of
-   ShiftKeys. No rights are granted except as expressly stated here, and none
-   arise by implication, estoppel, or otherwise.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-2. SOURCE-VIEWING PERMISSION
-   ShiftKeys grants you a limited, personal, non-exclusive, non-transferable,
-   non-sublicensable, revocable permission to view and read the published source
-   code, and to fork it on GitHub only to the extent required by GitHub's
-   platform features to view the code. This permission does not include any right
-   to use, run, modify, or redistribute the Software.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-3. LIMITED END-USER LICENSE
-   Separately, and solely for end users who obtain the Software through an
-   official distribution channel authorized by ShiftKeys (for example, the Visual
-   Studio Code Marketplace listing or an official build published by ShiftKeys),
-   ShiftKeys grants a personal, non-exclusive, non-transferable,
-   non-sublicensable, revocable license to install and run the Software as
-   distributed, in unmodified form, for its intended purpose. This license does
-   not permit redistribution, modification, or any commercial exploitation of the
-   Software.
-
-4. RESTRICTIONS
-   Except as expressly permitted above or by ShiftKeys in a signed writing, you
-   may not, and may not permit any third party to:
-     (a) copy, reproduce, publish, distribute, sell, rent, lease, sublicense, or
-         otherwise make the Software available to any third party;
-     (b) modify, adapt, translate, or create derivative works of the Software;
-     (c) use the Software, or any portion of it, to develop, train, evaluate
-         against, or operate a product or service that competes with the Software
-         or with ShiftKeys;
-     (d) remove, obscure, or alter any proprietary notice; or
-     (e) circumvent or disable any license, billing, telemetry-integrity, or
-         security mechanism in the Software.
-
-5. CONTRIBUTIONS
-   ShiftKeys does not solicit external contributions. If you submit any
-   contribution to the Software, then to the maximum extent permitted by law you
-   hereby irrevocably assign to ShiftKeys all right, title, and interest in it
-   (including all intellectual property rights) and waive any moral rights; to
-   the extent that assignment is unenforceable, you instead grant ShiftKeys a
-   perpetual, irrevocable, worldwide, royalty-free, fully paid-up, sublicensable,
-   and transferable license to exploit the contribution for any purpose. You
-   represent that you have the right to do so.
-
-6. THIRD-PARTY COMPONENTS
-   The Software may include third-party components licensed under their own
-   terms; those terms govern those components, and this license applies only to
-   the portions owned by ShiftKeys.
-
-7. COMMERCIALIZATION AND ASSIGNMENT
-   ShiftKeys may at any time license, relicense, sell, assign, transfer, or
-   otherwise commercialize the Software or any rights in it; change the terms on
-   which it is offered, including ceasing to publish the source or releasing
-   future versions under different terms; and assign this license together with
-   all of its rights to any successor or acquirer without your consent.
-   Commercial use by you requires a separate, paid, written license; to inquire,
-   contact support@kickbacks.ai.
-
-8. TERMINATION
-   This license terminates automatically upon any breach, and ShiftKeys may
-   revoke it at any time. Upon termination you must cease all use of the Software
-   and destroy all copies in your possession or control. Sections 1, 4, 5, 6, 7,
-   9, 10, and 11 survive termination.
-
-9. NO WARRANTY
-   THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTY OF ANY
-   KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT.
-
-10. LIMITATION OF LIABILITY
-   TO THE MAXIMUM EXTENT PERMITTED BY LAW, IN NO EVENT SHALL SHIFTKEYS BE LIABLE
-   FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR
-   ANY LOSS OF PROFITS, REVENUE, DATA, OR GOODWILL, ARISING OUT OF OR RELATED TO
-   THE SOFTWARE OR THIS LICENSE, WHETHER IN CONTRACT, TORT, OR OTHERWISE, EVEN IF
-   ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
-
-11. GENERAL
-   This license is governed by the laws of the State of Delaware, USA, without
-   regard to its conflict-of-laws rules, and the exclusive venue for any dispute
-   is the state and federal courts located in Delaware. If any provision is held
-   unenforceable, it shall be limited or severed so that the remainder remains in
-   effect. No failure to enforce any provision is a waiver of it. You may not
-   assign this license; ShiftKeys may freely assign it.
-
-For licensing inquiries, contact: support@kickbacks.ai
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

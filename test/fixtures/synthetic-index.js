@@ -1,1 +1,0 @@
-var X=1;var VERBS=["Accomplishing","Discombobulating","Brewing","Calculating"];console.log(VERBS);var Y=2;

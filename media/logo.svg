@@ -1,5 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="Kickbacks.ai">
-  <defs><linearGradient id="kb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2aa44f"/><stop offset="1" stop-color="#147a34"/></linearGradient></defs>
-  <rect x="4" y="4" width="120" height="120" rx="28" fill="url(#kb)"/>
-  <text x="64" y="64" text-anchor="middle" dominant-baseline="central" font-family="Montserrat, -apple-system, 'Segoe UI', Arial, sans-serif" font-weight="800" font-size="62" letter-spacing="-2" fill="#fff">K$</text>
-</svg>
