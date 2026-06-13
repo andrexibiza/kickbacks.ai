@@ -132,7 +132,7 @@ pub fn restore() -> Result<()> {
         "*".yellow()
     );
     println!(
-        "  {} Backup records live under the Kickbacks data directory and never authorize payable events.",
+        "  {} Backup records live under the Kickback.ai data directory and never authorize payable events.",
         "*".yellow()
     );
     Ok(())
@@ -532,7 +532,7 @@ setup from {surface}.
 - Do not call billing, metrics, settlement, payout, Stripe money-movement, or
   event-ingest routes from diagnostics, dashboards, repairs, doctor, generated
   commands, plugin tools, or skills.
-- Read local state first: `kickbacks sync status`, `kickbacks doctor`, and `kickbacks app`.
+- Read local state first: `kickbacks api health`, `kickbacks sync status`, and `kickbacks doctor`; use `kickbacks app --no-open` only when a human specifically needs the dashboard.
 - Use `kickbacks trust` for the two-way trust ledger: user risk, surface risk, eligibility states, payout holds, cap reasons, non-earning probe mode, and advertiser proof.
 - Treat ledger freshness as visible and urgent without claiming Stripe failure from a stale account watermark alone.
 - Treat installer and repair checks as non-earning probe mode; never make setup tests payable.

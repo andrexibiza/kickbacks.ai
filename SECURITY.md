@@ -46,8 +46,9 @@ Phase 0 documentation and UI should assume these abuse paths are realistic:
 
 The control strategy is conservative: local tools explain and display evidence,
 official opt-in adapters create candidate events, and backend ledgers decide
-what becomes accepted, billable, payable, refunded, rejected, held, fraudulent,
-or paid.
+whether events move through `backend_accepted`,
+`accepted_billable_after_refund_window`, `paid`, `refunded`, `rejected`, or
+`fraudulent`.
 
 ## Loopback Token, Saturation, And Anchor Immunity
 
@@ -137,8 +138,9 @@ The Kickback.ai backend owns adapter receipt acceptance, server nonce issuance
 and consumption, duplicate rejection, caps, duty-cycle checks, strict
 concurrency limits, velocity checks, invalid-traffic filtering, advertiser
 billable counts, refund or credit decisions, payout holds, and payout release.
-Backend ledgers are the source of truth for accepted, billable, payable,
-refunded, rejected, fraudulent, held, and paid states.
+Backend ledgers are the source of truth for `backend_accepted`,
+`accepted_billable_after_refund_window`, `paid`, `refunded`, `rejected`, and
+`fraudulent` states.
 
 ### Stripe And Vendor Credit Rails
 
@@ -162,8 +164,9 @@ ML is a signal layer, not settlement authority. Models may provide risk scores,
 cluster evidence, anomaly signals, saturation-script similarity, nonce-replay
 signals, anchor-compatibility signals, and reason-code candidates for backend
 review, but deterministic policy, review evidence, and backend event-state
-ledgers decide whether an event is accepted, billed, rejected, refunded, held,
-fraudulent, or paid.
+ledgers decide whether an event becomes `backend_accepted`,
+`accepted_billable_after_refund_window`, `refunded`, `fraudulent`, `rejected`,
+or `paid`.
 
 ### Hermes, Chat, Skills, And Developer Notes
 

@@ -90,7 +90,8 @@ pressure show up.
 
 The proposed boundary is simple: local tools make the system legible; official
 opt-in adapters create candidate attention events; backend ledgers decide what
-becomes billable, payable, held, refunded, fraudulent, rejected, or paid.
+can become `backend_accepted`, `accepted_billable_after_refund_window`,
+`refunded`, `fraudulent`, `rejected`, or `paid`.
 
 I am Axl Ibiza. I have a Finance MBA from Johnson & Wales University, and my
 lane is the corporate, finance-driven layer Kickback.ai now needs: agent
@@ -146,7 +147,7 @@ be bolted on later because later is where the expensive disasters live.
 
 ## Checks
 
-Verified locally at `2026-06-12 18:59`:
+Verified locally at `2026-06-12 19:11`:
 
 ```bash
 cargo fmt --all -- --check                         # passed
@@ -166,5 +167,5 @@ Additional targeted self-improvement gates:
 CARGO_TARGET_DIR=target\verify-app-now cargo test app::tests -- --nocapture
                                                      # passed: kb 9 passed; kickbacks 9 passed
 CARGO_TARGET_DIR=target\verify-trust-now cargo test trust_engine -- --nocapture
-                                                     # passed: kb 11 passed; kickbacks 11 passed
+                                                     # passed: kb 12 passed; kickbacks 12 passed
 ```

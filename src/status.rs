@@ -1,6 +1,6 @@
-//! `kb status` — an honest, local read of whether kickbacks ads are flowing
+//! `kb status` — an honest, local read of whether Kickback.ai ads are flowing
 //! right now, and why. No network: every signal comes from the files the
-//! extension already writes. kickbacks.ai has no status page, so this is as
+//! extension already writes. Kickback.ai has no status page, so this is as
 //! close to one as you get; the maintainer posts incidents on X (@andrewmccalip).
 
 use anyhow::Result;
@@ -93,7 +93,7 @@ pub fn run() -> Result<()> {
     if status == AdStatus::Paused {
         println!(
             "  {}",
-            "ads are paused on kickbacks.ai's side. you did not cause this and cannot override it."
+            "ads are paused on Kickback.ai's side. you did not cause this and cannot override it."
                 .yellow()
         );
     }
