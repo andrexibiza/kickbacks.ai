@@ -132,6 +132,13 @@ local control-surface claims:
 - Stripe Connect stays server-side: local controls can show backend-provided
   requirements and payout readiness, but never holds Stripe secrets or creates
   money movement;
+- Stripe Connect policy is part of the trust boundary, not a later payment
+  detail: account type and controller responsibilities affect fraud, abuse,
+  negative-balance, and identity-verification liability; KYC requirements can
+  pause charges or payouts; marketplace-style account setups can make the
+  platform responsible for negative balances and credit or fraud risk; and
+  product language must avoid positioning Kickback.ai as resale of traffic or
+  easy-money rewards;
 - international payout readiness is a backend product boundary, including
   connected-account country support, requested capabilities, account-link
   refresh/return handling, onboarding completion, verification requirements,
@@ -139,6 +146,59 @@ local control-surface claims:
 - Telegram, Discord, and other external surfaces use the same
   official-adapter contract; earning must not be created by hidden bot flows,
   skills, dashboards, repair probes, or unauthenticated chat output.
+
+### IDE-local trust boundary
+
+IDE integrations are high-risk because the developer machine often contains
+source code, production credentials, API keys, SSH agents, signing material, and
+private customer or advertiser context. Kickback.ai adapters must therefore be
+API-native and fail closed:
+
+- local artifacts, logs, workspace settings, extension state, and loopback
+  tokens are diagnostic inputs only;
+- no local IDE file, extension global state, loopback token, or marketplace
+  directory name can prove human attention or payout readiness;
+- official adapters should use supported IDE APIs, scoped short-lived secrets,
+  signed adapter releases, signed compatibility manifests, and server-issued
+  single-use nonces;
+- adapter updates and third-party bundle anchors must fail to probe-only mode
+  when signatures, publisher identity, compatibility manifests, or expected
+  anchors do not verify;
+- Kickback.ai should not patch third-party IDE bundles, webviews, scripts, or
+  upstream-owned files to inject monetization behavior.
+
+## Stripe Connect And Policy Constraints
+
+Official Stripe references checked at `2026-06-12 19:23`:
+[Connect risk and liability](https://docs.stripe.com/connect/risk-management),
+[identity verification](https://docs.stripe.com/connect/identity-verification),
+[connected account types](https://docs.stripe.com/connect/accounts),
+[marketplace account creation](https://docs.stripe.com/connect/marketplace/tasks/create),
+[API verification handling](https://docs.stripe.com/connect/handling-api-verification),
+and [prohibited and restricted businesses](https://stripe.com/legal/restricted-businesses).
+
+These references translate into Kickback.ai product rules:
+
+- choose and record the Connect liability model before payout release; account
+  type and controller responsibilities determine who owns fraud, abuse,
+  negative-balance, and identity-verification risk;
+- treat Stripe KYC and requirement status as dynamic backend state. The backend
+  should monitor account and person updates, surface currently due and
+  eventually due requirements, and expect charges or payouts to pause until
+  required information is resolved;
+- if Kickback.ai uses marketplace-style connected accounts or indirect charges,
+  the backend must model platform liability for negative balances, reserves,
+  refunds, disputes, and fraud review before releasing developer payouts;
+- local software may display backend-provided Stripe onboarding, requirements,
+  and payout readiness, but must not create account links, charges, transfers,
+  payouts, refunds, credits, or connected-account mutations;
+- Stripe secret keys, account tokens, payout identifiers, tax data, and
+  connected-account credentials must stay server-side and out of local logs,
+  docs, prompts, screenshots, fixtures, and generated notes;
+- copy and advertiser reports must describe verified developer attention,
+  filtered final reach, and backend-ledgered settlement. They must not imply
+  resale of online traffic or engagement, guaranteed rewards, unrealistic
+  incentives, or fast/easy money.
 
 ## Reward Exchange
 

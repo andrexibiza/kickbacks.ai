@@ -121,6 +121,27 @@ until a signed compatibility manifest and release gate approve the new surface
 version. A broken anchor must never silently create earning candidates,
 billable reach, or payable rewards.
 
+## IDE-Local Trust Boundary
+
+IDE-local evidence is hostile-by-default. Developer tools routinely hold source
+code, local credentials, API keys, signing agents, and production context, so a
+Kickback.ai adapter cannot treat local IDE state as settlement truth.
+
+Rules:
+
+- extension global state, workspace settings, loopback tokens, local artifact
+  files, marketplace directory names, and debug logs are never payout authority;
+- an official adapter must provide signed receipts, adapter ID/version, key ID,
+  user opt-in, visibility proof, session binding, a server-issued single-use
+  nonce, and a signed compatibility manifest;
+- invasive patching of upstream IDE bundles, webviews, scripts, or template
+  anchors is not an earning path; if an anchor drifts, the surface becomes
+  probe-only until a signed release gate accepts the new version;
+- update channels must fail closed on missing signatures, publisher mismatch, or
+  compatibility-manifest mismatch;
+- the backend, not the IDE, decides acceptance, rejection, holds, refunds,
+  advertiser reporting, and payout release.
+
 ## State Machine
 
 Events move through explicit states. The "backend only" values below are state
@@ -298,6 +319,26 @@ release funds only after accepted earning, refund buffers, payout holds, KYC,
 1099/reporting, and Connect account requirements clear on the
 Kickback.ai backend.
 
+Official Stripe references checked at `2026-06-12 19:23` make this a
+compliance and risk boundary, not just an API placement decision:
+
+- [Connect risk and liability](https://docs.stripe.com/connect/risk-management)
+  requires the platform to decide and track responsibility for losses, fraud
+  and abuse, negative balances, pricing/fees, and payout controls;
+- [connected account types](https://docs.stripe.com/connect/accounts) determine
+  liability and support responsibilities, and cannot be treated as
+  interchangeable after account creation;
+- [identity verification](https://docs.stripe.com/connect/identity-verification)
+  and [API verification handling](https://docs.stripe.com/connect/handling-api-verification)
+  require dynamic KYC and requirements monitoring before charges and payouts;
+- [marketplace account creation](https://docs.stripe.com/connect/marketplace/tasks/create)
+  can make the platform responsible for negative balances and credit or fraud
+  risk, depending on the selected responsibility model;
+- [Stripe restricted-business policy](https://stripe.com/legal/restricted-businesses)
+  makes product positioning part of the risk control: Kickback.ai must frame
+  verified developer attention and final billable reach, not traffic resale,
+  unrealistic incentives, guaranteed rewards, or fast/easy money.
+
 International onboarding is a backend settlement concern, not a local repair
 task. Country support, requested capabilities, account-link expiration,
 return/refresh handling, onboarding completion, verification requirements,
@@ -307,3 +348,14 @@ ledger-visible before the UI presents a user as payout-ready.
 Local surfaces must never hold Stripe secret keys, create money movement,
 release cash payouts, create sponsor credits, apply exchange multipliers, link
 vendor accounts, or reverse balances.
+
+The Trust Engine should expose Stripe-related state only as backend-provided
+facts, for example:
+
+- selected Connect responsibility model and account type/controller properties;
+- currently due, eventually due, pending verification, disabled reason, and
+  payout/charge capability state;
+- payout hold, reserve, negative-balance, refund, dispute, reversal, and release
+  ledger entries;
+- compliance copy review status when product language approaches online traffic
+  or engagement resale, high-reward incentive, or easy-money claims.

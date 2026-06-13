@@ -86,6 +86,45 @@ enters probe or incompatible mode until a signed compatibility manifest and
 release gate approve the new surface version. Anchor drift must never silently
 create earning candidates, billable reach, or payable developer rewards.
 
+### IDE-Local File And Extension Trust Boundary
+
+Developer environments hold source code, private repositories, production
+credentials, API keys, signing material, SSH agents, and customer context. Any
+Kickback.ai adapter that reads or modifies IDE-local files starts from that
+trust deficit and must stay intentionally narrow.
+
+Current local control surfaces may read local artifacts such as
+`~/.vibe-ads/cli-ad.json`, `~/.vibe-ads/debug.log`, and the presence of
+`~/.kickbacks/auth.json`. That evidence is diagnostic only. It must never become
+human-attention proof, billing authority, payout readiness, Stripe readiness, or
+advertiser proof by itself.
+
+Design rules for IDE integrations:
+
+- do not patch third-party IDE bundles, webviews, scripts, templates, or
+  upstream-owned extension files to inject monetization UI;
+- do not store long-lived bearer tokens, refresh tokens, payout identifiers,
+  Stripe secrets, advertiser secrets, or backend signing material in extension
+  global state, workspace settings, checked-in files, logs, prompts, or
+  screenshots;
+- treat any token visible to VS Code, another extension, an agent, or a local
+  process as bearer material only, never as proof of viewability or work;
+- prefer official APIs, extension points, OS keychain or platform secret
+  storage, short-lived scoped tokens, and backend-issued single-use nonces;
+- require signed adapter releases, signed compatibility manifests, publisher
+  identity checks, and fail-closed update and anchor preflights before an
+  adapter can create earning candidates;
+- if an IDE or extension marketplace update, upstream template, or bundle anchor
+  changes, fall back to probe-only mode until the backend approves the new
+  signed compatibility state.
+
+Marketplace malware and same-host extension risks are part of the threat model.
+An unrelated malicious extension or local dependency may read accessible files,
+observe workspace state, alter user configuration, or exfiltrate developer
+secrets. Kickback.ai's defense is to keep client-side evidence minimal and
+revocable, keep settlement server-owned, and make local IDE state insufficient
+for billable or payable events.
+
 ## Trust Boundaries
 
 ### Local App, CLI, And TUI
@@ -157,6 +196,37 @@ connected-account country support, requested capabilities, account-link
 expiration and return/refresh URLs, onboarding completion, verification
 requirements, tax/reporting status, payout holds, and unsupported-country
 fallbacks before the UI presents a user as payout-ready.
+
+Official Stripe policy is part of this security boundary. As checked at
+`2026-06-12 19:23`, Stripe's Connect documentation says account configuration
+affects responsibility for fraud, abuse, negative balances, and identity
+verification; connected-account KYC requirements vary by country, capability,
+business type, service agreement, and risk level; and charges or payouts can be
+paused when required information is missing or unverified. If Kickback.ai uses
+marketplace-style accounts, the selected responsibility model must be tracked as
+backend risk state before payout release.
+
+The backend must therefore:
+
+- persist the selected Connect account/controller responsibility model and who
+  owns losses, fraud/abuse handling, fees, identity collection, and payout
+  controls;
+- monitor Stripe account and person requirement updates through backend APIs or
+  webhooks, not local logs;
+- keep connected-account onboarding, account-link refresh/return handling,
+  requirements, reserves, negative balances, disputes, refunds, payout holds,
+  and payout release in backend ledgers;
+- block local code from creating account links, connected accounts, charges,
+  transfers, payouts, refunds, credits, reversals, or money movement;
+- keep Stripe secret keys, account tokens, payout identifiers, tax data, and
+  connected-account credentials out of client storage, prompts, screenshots,
+  public issues, fixtures, and generated notes.
+
+Stripe's restricted-business policy also creates a copy and product-design
+security rule. Kickback.ai must describe verified developer attention,
+advertiser assurance, and final billable reach after fraud filtering. It must
+not imply resale of online traffic or engagement, unrealistic incentives,
+guaranteed rewards, or fast/easy money.
 
 ### ML And Bot Signals
 

@@ -76,6 +76,10 @@ work:
   hold ledgers;
 - backend settlement for cash, sponsor-funded credits, and Reward Exchange;
 - Stripe Connect and vendor credit rails on the backend;
+- official Stripe Connect policy carried into the docs: account type and
+  controller responsibility affect fraud, abuse, negative-balance, and identity
+  verification liability; KYC requirements can pause charges or payouts; and
+  product copy must avoid traffic-resale or easy-money positioning;
 - Telegram, Discord, CLI/TUI, desktop, chat, and agent workflow earning
   adapters belong behind the same signed adapter and trust-ledger contract;
 - ML fraud signals as reason-code evidence, not payout authority.
@@ -119,6 +123,15 @@ be bolted on later because later is where the expensive disasters live.
   threats handled by signed adapters, server-side nonces, duty-cycle and strict
   concurrency checks, human-in-the-loop ML review, and backend settlement
   ledgers.
+- No claim that Stripe approval, account onboarding, or payout readiness is
+  final trust authority. Stripe is a payout rail and compliance input; backend
+  ledgers still own fraud review, refund windows, holds, and settlement.
+- No product positioning that treats Kickback.ai as resale of online traffic or
+  engagement, guaranteed rewards, unrealistic incentives, or fast/easy money.
+- No invasive IDE patching architecture: adapters should use supported IDE APIs,
+  avoid storing long-lived bearer material in extension global state or
+  workspace settings, and fail closed on unsigned updates, publisher mismatch,
+  or compatibility-manifest drift.
 - No insult to the current product; the language treats this as a trust and
   packaging layer over the existing upstream surface.
 
