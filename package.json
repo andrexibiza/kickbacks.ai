@@ -1,0 +1,229 @@
+{
+  "name": "kickbacks-ai",
+  "displayName": "Kickbacks.ai",
+  "publisher": "Kickbacksai",
+  "version": "0.3.174",
+  "description": "Get paid while you code. Subtle, clickable ads in the Claude Code and Codex spinners — 50/50 revenue split to users.",
+  "icon": "media/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/andrewmccalip/kickbacks.ai.git"
+  },
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "kickbacks.signIn",
+        "title": "Kickbacks: Sign in"
+      },
+      {
+        "command": "kickbacks.signOut",
+        "title": "Kickbacks: Sign out"
+      },
+      {
+        "command": "kickbacks.restore",
+        "title": "Kickbacks: Restore Claude Code"
+      },
+      {
+        "command": "kickbacks.status",
+        "title": "Kickbacks: Show status"
+      },
+      {
+        "command": "kickbacks.debugMenu",
+        "title": "Kickbacks: Menu"
+      },
+      {
+        "command": "kickbacks.editConfig",
+        "title": "Kickbacks: Edit Config"
+      },
+      {
+        "command": "kickbacks.diagnose",
+        "title": "Kickbacks: Diagnose"
+      },
+      {
+        "command": "vibe-ads.diagnose",
+        "title": "Kickbacks: Diagnose (legacy alias)"
+      },
+      {
+        "command": "vibe-ads.signIn",
+        "title": "Kickbacks: Sign in (legacy alias)"
+      },
+      {
+        "command": "vibe-ads.signOut",
+        "title": "Kickbacks: Sign out (legacy alias)"
+      },
+      {
+        "command": "vibe-ads.restore",
+        "title": "Kickbacks: Restore Claude Code (legacy alias)"
+      },
+      {
+        "command": "vibe-ads.status",
+        "title": "Kickbacks: Show status (legacy alias)"
+      },
+      {
+        "command": "vibe-ads.debugMenu",
+        "title": "Kickbacks: Menu (legacy alias)"
+      },
+      {
+        "command": "kickbacks.test.fireImpressionRendered",
+        "title": "Kickbacks (Test): Fire impression_rendered"
+      },
+      {
+        "command": "kickbacks.test.fireImpressionViewable",
+        "title": "Kickbacks (Test): Fire impression_viewable"
+      },
+      {
+        "command": "kickbacks.test.fireViewTick",
+        "title": "Kickbacks (Test): Fire view_tick"
+      },
+      {
+        "command": "kickbacks.test.fireViewThresholdMet",
+        "title": "Kickbacks (Test): Fire view_threshold_met (credits)"
+      },
+      {
+        "command": "kickbacks.test.fireErrorImpression",
+        "title": "Kickbacks (Test): Fire error_impression (5s stuck-session safety net)"
+      },
+      {
+        "command": "kickbacks.test.fireClick",
+        "title": "Kickbacks (Test): Fire click"
+      },
+      {
+        "command": "kickbacks.test.refreshPortfolio",
+        "title": "Kickbacks (Test): Refresh portfolio"
+      },
+      {
+        "command": "kickbacks.test.refreshEarnings",
+        "title": "Kickbacks (Test): Refresh earnings"
+      },
+      {
+        "command": "kickbacks.test.getState",
+        "title": "Kickbacks (Test): Get state snapshot"
+      },
+      {
+        "command": "kickbacks.test.clearEventLog",
+        "title": "Kickbacks (Test): Clear event log"
+      },
+      {
+        "command": "kickbacks.test.disableInjection",
+        "title": "Kickbacks (Test): Disable injection"
+      },
+      {
+        "command": "kickbacks.test.enableInjection",
+        "title": "Kickbacks (Test): Enable injection"
+      },
+      {
+        "command": "kickbacks.test.refreshStatusBar",
+        "title": "Kickbacks (Test): Refresh status bar"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "kickbacks.test.fireImpressionRendered",
+          "when": "kickbacks.test.enabled"
+        },
+        {
+          "command": "kickbacks.test.fireImpressionViewable",
+          "when": "kickbacks.test.enabled"
+        },
+        {
+          "command": "kickbacks.test.fireViewTick",
+          "when": "kickbacks.test.enabled"
+        },
+        {
+          "command": "kickbacks.test.fireViewThresholdMet",
+          "when": "kickbacks.test.enabled"
+        },
+        {
+          "command": "kickbacks.test.fireErrorImpression",
+          "when": "kickbacks.test.enabled"
+        },
+        {
+          "command": "kickbacks.test.fireClick",
+          "when": "kickbacks.test.enabled"
+        },
+        {
+          "command": "kickbacks.test.refreshPortfolio",
+          "when": "kickbacks.test.enabled"
+        },
+        {
+          "command": "kickbacks.test.refreshEarnings",
+          "when": "kickbacks.test.enabled"
+        },
+        {
+          "command": "kickbacks.test.getState",
+          "when": "kickbacks.test.enabled"
+        },
+        {
+          "command": "kickbacks.test.clearEventLog",
+          "when": "kickbacks.test.enabled"
+        },
+        {
+          "command": "kickbacks.test.disableInjection",
+          "when": "kickbacks.test.enabled"
+        },
+        {
+          "command": "kickbacks.test.enableInjection",
+          "when": "kickbacks.test.enabled"
+        },
+        {
+          "command": "kickbacks.test.refreshStatusBar",
+          "when": "kickbacks.test.enabled"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Kickbacks",
+      "properties": {
+        "kickbacks.viewThresholdSeconds": {
+          "type": "number",
+          "default": 5,
+          "minimum": 1,
+          "maximum": 600,
+          "description": "Seconds of cumulative visible time an ad must accumulate before it counts as 'shown' and is credited."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "icon": "node scripts/gen-icon.mjs",
+    "package": "node scripts/package.mjs",
+    "marketplace:publish": "vsce publish --no-dependencies --packagePath kickbacks.vsix"
+  },
+  "devDependencies": {
+    "@types/jsdom": "21.1.7",
+    "@types/node": "20.14.0",
+    "@types/vscode": "1.80.0",
+    "@vscode/vsce": "2.31.0",
+    "esbuild": "^0.23.0",
+    "jsdom": "24.1.0",
+    "typescript": "5.5.4",
+    "vitest": "2.0.5"
+  },
+  "author": {
+    "name": "ShiftKeys, Inc.",
+    "url": "https://kickbacks.ai"
+  },
+  "license": "SEE LICENSE IN LICENSE",
+  "homepage": "https://kickbacks.ai",
+  "bugs": {
+    "url": "https://github.com/andrewmccalip/kickbacks.ai/issues"
+  },
+  "keywords": [
+    "claude-code",
+    "ads",
+    "spinner",
+    "earnings",
+    "kickbacks"
+  ]
+}

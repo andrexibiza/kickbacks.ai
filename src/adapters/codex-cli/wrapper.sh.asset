@@ -1,0 +1,13 @@
+#!/bin/sh
+# ===== VIBE-ADS-CODEX-CLI =====
+# Reversible Kickbacks wrapper around the npm-installed codex shim.
+# Prints a one-line ad banner read from "__VIBE_ADS_AD_PATH__" then
+# exec's the pristine shim at "__VIBE_ADS_BACKUP__".
+# Restore: copy that backup back over this file (or run kickbacks restore).
+AD_FILE="__VIBE_ADS_AD_PATH__"
+AD_TEXT="Earning Kickback"
+if [ -r "$AD_FILE" ]; then
+  AD_TEXT=$(head -n 1 "$AD_FILE" 2>/dev/null || echo "Earning Kickback")
+fi
+printf '\n  [ad]  %s\n\n' "$AD_TEXT"
+exec "__VIBE_ADS_BACKUP__" "$@"

@@ -1,25 +1,4 @@
-/target
-**/*.rs.bk
-*.pdb
-
-# Local capture DB should never be committed (it is the user's personal ad history)
-*.sqlite
-*.sqlite-journal
-*.sqlite-wal
-*.sqlite-shm
-kickbacks.db*
-
-# Exports
-/exports/
-*.jsonl
-*.csv
-
-# Editor / OS
-.DS_Store
-.vscode/
-.idea/
-
-# Local project rules and handoffs (private, not for the public repo)
-/CLAUDE.md
-/HANDOFF_MISSION_2.md
-/HANDOFF_MISSION_3.md
+node_modules/
+dist/
+.vsce-stage/
+*.vsix

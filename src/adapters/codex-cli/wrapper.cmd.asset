@@ -1,0 +1,20 @@
+@ECHO off
+REM ===== VIBE-ADS-CODEX-CLI =====
+REM Reversible Kickbacks wrapper around the npm-installed codex shim.
+REM Prints a one-line ad banner read from "__VIBE_ADS_AD_PATH__" then
+REM delegates to the pristine shim at "__VIBE_ADS_BACKUP__".
+REM Restore: copy that backup back over this file (or run kickbacks restore).
+setlocal enabledelayedexpansion
+set "__KB_AD_FILE=__VIBE_ADS_AD_PATH__"
+set "__KB_AD=Earning Kickback"
+if exist "%__KB_AD_FILE%" (
+  for /f "usebackq delims=" %%A in ("%__KB_AD_FILE%") do (
+    set "__KB_AD=%%A"
+    goto :__kb_after
+  )
+)
+:__kb_after
+echo.
+echo   [ad]  !__KB_AD!
+echo.
+endlocal & call "__VIBE_ADS_BACKUP__" %*
